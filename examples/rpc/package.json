@@ -1,9 +1,10 @@
 {
-  "name": "spike",
+  "name": "@starflame/example-rpc",
   "private": true,
   "type": "module",
   "scripts": {
-    "exp": "gleam build && node experiments/run.mjs"
+    "exp": "gleam build && node experiments/run.mjs",
+    "build": "gleam build"
   },
   "dependencies": {
     "capnweb": "0.12.0"
@@ -14,6 +15,7 @@
     "esbuild": "^0.28.2",
     "miniflare": "5.20261001.0-alpha",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2"
+    "vite": "^8.3.2",
+    "@starflame/runtime": "workspace:*"
   }
 }

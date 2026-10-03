@@ -1,0 +1,19 @@
+{
+  "name": "starflame-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "pnpm --filter @starflame/vite build",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm --filter @starflame/example-rpc exp",
+    "dev": "pnpm --filter @starflame/vite build && pnpm --filter @starflame/example-todo dev",
+    "smoke": "pnpm --filter @starflame/example-todo smoke",
+    "test:compare": "pnpm --filter @starflame/example-todo test:compare",
+    "deploy:todo": "pnpm --filter @starflame/vite build && pnpm --filter @starflame/example-todo run deploy"
+  }
+}

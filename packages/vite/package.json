@@ -1,0 +1,38 @@
+{
+  "name": "@starflame/vite",
+  "version": "0.1.0",
+  "description": "Vite integration for Starflame Gleam applications",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "vite": ">=8.0.0 <9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "rolldown": "1.2.12",
+    "typescript": "7.0.2",
+    "vite": "8.3.2"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peculiarnewbie/starflame.git",
+    "directory": "packages/vite"
+  }
+}

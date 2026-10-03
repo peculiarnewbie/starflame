@@ -1,0 +1,8 @@
+{
+  "name": "@starflame/runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "gleam build"
+  }
+}

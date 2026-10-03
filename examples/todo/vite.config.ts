@@ -1,6 +1,6 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { defineConfig } from "vite";
-import { gleam } from "../starflame/js/vite.ts";
+import { gleam } from "@starflame/vite";
 
 export default defineConfig({
   plugins: [gleam(), cloudflare()],
