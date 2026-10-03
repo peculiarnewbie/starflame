@@ -1,20 +1,19 @@
 // GENERATED (hand-written for now): the Worker entrypoint.
 
-import { newWorkersRpcResponse } from "capnweb";
-import { newApi } from "./build/dev/javascript/todos/todos/generated/targets.ts";
+export { TodoRoom } from "./room.ts";
 
 export default {
-  async fetch(request: Request, env: unknown, execution: ExecutionContext) {
+  async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/rpc") {
+    if (["/rpc", "/live/rpc", "/server/socket"].includes(url.pathname)) {
       // Cap'n Web doesn't check Origin, and browsers allow cross-site
       // WebSockets, so reject other sites here.
       const origin = request.headers.get("Origin");
       if (origin !== null && origin !== url.origin) {
         return new Response("Forbidden origin", { status: 403 });
       }
-      return newWorkersRpcResponse(request, newApi(env, execution));
+      return env.ROOM.getByName("public-demo").fetch(request);
     }
 
     return new Response("Not found", { status: 404 });

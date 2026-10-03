@@ -1,11 +1,37 @@
 //// GENERATED (hand-written for now): typed client stubs.
 
-import starflame/client.{type RpcError, type Stub}
-import starflame/plain
+import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}
+import starflame/client.{type RpcError, type Stub}
+import starflame/plain
 import todos/generated/wire
-import todos/shared.{type Todo, type TodoError}
+import todos/shared.{type Change, type Todo, type TodoError}
+
+pub fn from_stub(stub: Stub) -> Api {
+  Api(stub)
+}
+
+pub fn from_dynamic(value: Dynamic) -> Api {
+  Api(unsafe_stub(value))
+}
+
+@external(javascript, "../client_ffi.mjs", "identity")
+fn unsafe_stub(value: Dynamic) -> Stub
+
+pub fn subscribe(
+  api: Api,
+  callback: fn(Change) -> Nil,
+) -> Promise(Result(Nil, RpcError)) {
+  client.call(
+    api.stub,
+    "subscribe",
+    [
+      client.callback1(callback, wire.change_decoder()),
+    ],
+    decode.success(Nil),
+  )
+}
 
 pub opaque type Api {
   Api(stub: Stub)

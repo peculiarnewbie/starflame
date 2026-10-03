@@ -4,7 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "cf dev",
-    "build": "cf build"
+    "build": "cf build",
+    "deploy": "cf deploy",
+    "smoke": "gleam build && node scripts/smoke.mjs",
+    "test:compare": "gleam build && node scripts/compare.mjs",
+    "typecheck": "gleam build && cf workers types && tsc --noEmit"
   },
   "dependencies": {
     "capnweb": "0.12.0"
@@ -12,6 +16,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "2.0.0-beta.sha-52b0dc0e9",
     "cf": "1.0.0-beta.10",
+    "playwright": "1.63.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
   }

@@ -1,6 +1,5 @@
 //// The Lustre SPA.
 
-import starflame/client.{type RpcError, Decode, Remote}
 import gleam/int
 import gleam/javascript/promise
 import gleam/list
@@ -12,21 +11,39 @@ import lustre/element.{type Element, text}
 import lustre/element/html
 import lustre/element/keyed
 import lustre/event
+import starflame/client.{type RpcError, Decode, Remote}
 import todos/generated/client as api
 import todos/shared.{
-  type Todo, type TodoError, EmptyTitle, NotFound, TitleTooLong, Todo,
+  type Change, type Todo, type TodoError, CompletedCleared, EmptyTitle, NotFound,
+  Removed, Snapshot, TitleTooLong, Todo, Upsert,
 }
 
 pub fn main() -> Nil {
+  start(Baseline)
+}
+
+pub fn live() -> Nil {
+  start(Live)
+}
+
+fn start(mode: Mode) -> Nil {
   let app = lustre.application(init, update, view)
-  let assert Ok(_) = lustre.start(app, "#app", Nil)
+  let assert Ok(_) = lustre.start(app, "#app", mode)
   Nil
+}
+
+pub type Mode {
+  Baseline
+  Live
+  Server
 }
 
 // MODEL -----------------------------------------------------------------------
 
-type Model {
+pub opaque type Model {
   Model(
+    mode: Mode,
+    revision: Int,
     api: api.Api,
     connection: Connection,
     todos: List(Todo),
@@ -42,16 +59,29 @@ type Connection {
   Offline(reason: String)
 }
 
-type Filter {
+pub type Filter {
   All
   Active
   Completed
 }
 
-fn init(_: Nil) -> #(Model, Effect(Msg)) {
-  let api = api.connect(client.same_origin_url("/rpc"))
+fn init(mode: Mode) -> #(Model, Effect(Msg)) {
+  let api = api.connect(client.same_origin_url(endpoint(mode)))
+  init_with_api(api, mode)
+}
+
+fn endpoint(mode: Mode) -> String {
+  case mode {
+    Live -> "/live/rpc"
+    _ -> "/rpc"
+  }
+}
+
+pub fn init_with_api(api: api.Api, mode: Mode) -> #(Model, Effect(Msg)) {
   let model =
     Model(
+      mode:,
+      revision: 0,
       api:,
       connection: Connecting,
       todos: [],
@@ -59,12 +89,19 @@ fn init(_: Nil) -> #(Model, Effect(Msg)) {
       filter: All,
       error: None,
     )
-  #(model, effect.batch([watch(api), fetch(api), on_focus()]))
+  let effects = case mode {
+    Baseline -> effect.batch([watch(api), fetch(api, 0), on_focus()])
+    Live -> effect.batch([watch(api), subscribe(api)])
+    Server -> fetch(api, 0)
+  }
+  #(model, effects)
 }
 
 // UPDATE ----------------------------------------------------------------------
 
-type Msg {
+pub type Msg {
+  Changed(Change)
+  Subscribed(Result(Nil, RpcError))
   UserEditedDraft(String)
   UserSubmittedDraft
   UserToggled(id: Int, done: Bool)
@@ -75,15 +112,38 @@ type Msg {
   WindowFocused
   ConnectionBroke(reason: String)
   RetryTimerFired
-  ApiReturnedTodos(Result(List(Todo), RpcError))
+  ApiReturnedTodos(revision: Int, reply: Result(List(Todo), RpcError))
   ApiAddedTodo(Result(Result(Todo, TodoError), RpcError))
   ApiUpdatedTodo(Result(Result(Todo, TodoError), RpcError))
   ApiDeletedTodo(id: Int, reply: Result(Result(Nil, TodoError), RpcError))
   ApiClearedCompleted(Result(Int, RpcError))
 }
 
-fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
+pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
+    Changed(change) -> {
+      let todos = case change {
+        Snapshot(todos) -> todos
+        Upsert(item) -> upsert(model.todos, item)
+        Removed(id) -> list.filter(model.todos, fn(item) { item.id != id })
+        CompletedCleared -> list.filter(model.todos, fn(item) { !item.done })
+      }
+      #(
+        Model(
+          ..model,
+          todos:,
+          connection: Online,
+          error: None,
+          revision: model.revision + 1,
+        ),
+        effect.none(),
+      )
+    }
+    Subscribed(Ok(Nil)) -> #(model, effect.none())
+    Subscribed(Error(error)) -> #(
+      Model(..model, error: Some(describe_rpc_error(error))),
+      effect.none(),
+    )
     UserEditedDraft(draft) -> #(Model(..model, draft:), effect.none())
 
     UserSubmittedDraft -> #(
@@ -122,7 +182,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     WindowFocused ->
       case model.connection {
-        Online -> #(model, fetch(model.api))
+        Online -> #(model, fetch(model.api, model.revision))
         _ -> #(model, effect.none())
       }
 
@@ -133,24 +193,42 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
 
     RetryTimerFired -> {
-      let api = api.connect(client.same_origin_url("/rpc"))
+      api.dispose(model.api)
+      let api = api.connect(client.same_origin_url(endpoint(model.mode)))
+      let load = case model.mode {
+        Live -> subscribe(api)
+        _ -> fetch(api, model.revision + 1)
+      }
       #(
-        Model(..model, api:, connection: Connecting),
-        effect.batch([watch(api), fetch(api)]),
+        Model(
+          ..model,
+          api:,
+          connection: Connecting,
+          revision: model.revision + 1,
+        ),
+        effect.batch([watch(api), load]),
       )
     }
 
-    ApiReturnedTodos(Ok(todos)) -> #(
-      Model(..model, todos:, connection: Online),
-      effect.none(),
-    )
+    // A focus fetch can arrive after a newer mutation or pushed change.
+    // Discard the old snapshot and resync rather than overwrite newer data.
+    ApiReturnedTodos(revision, Ok(todos)) -> {
+      case revision == model.revision {
+        True -> #(
+          Model(..model, todos:, connection: Online, error: None),
+          effect.none(),
+        )
+        False -> #(model, fetch(model.api, model.revision))
+      }
+    }
 
     ApiAddedTodo(Ok(Ok(item))) -> #(
       Model(
         ..model,
-        todos: list.append(model.todos, [item]),
+        todos: upsert(model.todos, item),
         draft: "",
         error: None,
+        revision: model.revision + 1,
       ),
       effect.none(),
     )
@@ -158,6 +236,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     ApiUpdatedTodo(Ok(Ok(item))) -> #(
       Model(
         ..model,
+        revision: model.revision + 1,
         todos: list.map(model.todos, fn(existing) {
           case existing.id == item.id {
             True -> item
@@ -169,12 +248,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     )
 
     ApiDeletedTodo(id:, reply: Ok(Ok(Nil))) -> #(
-      Model(..model, todos: list.filter(model.todos, fn(item) { item.id != id })),
+      Model(
+        ..model,
+        revision: model.revision + 1,
+        todos: list.filter(model.todos, fn(item) { item.id != id }),
+      ),
       effect.none(),
     )
 
     ApiClearedCompleted(Ok(_)) -> #(
-      Model(..model, todos: list.filter(model.todos, fn(item) { !item.done })),
+      Model(
+        ..model,
+        todos: list.filter(model.todos, fn(item) { !item.done }),
+        revision: model.revision + 1,
+      ),
       effect.none(),
     )
 
@@ -183,12 +270,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     | ApiUpdatedTodo(Ok(Error(error)))
     | ApiDeletedTodo(reply: Ok(Error(error)), ..) -> #(
       Model(..model, error: Some(describe_todo_error(error))),
-      fetch(model.api),
+      fetch(model.api, model.revision),
     )
 
     // Transport failures. A broken session also fires ConnectionBroke, which
     // handles reconnecting.
-    ApiReturnedTodos(Error(error))
+    ApiReturnedTodos(_, Error(error))
     | ApiAddedTodo(Error(error))
     | ApiUpdatedTodo(Error(error))
     | ApiDeletedTodo(reply: Error(error), ..)
@@ -217,8 +304,28 @@ fn describe_rpc_error(error: RpcError) -> String {
 
 // EFFECTS ---------------------------------------------------------------------
 
-fn fetch(api: api.Api) -> Effect(Msg) {
-  client.effect(api.list_todos(api), ApiReturnedTodos)
+fn upsert(todos: List(Todo), item: Todo) -> List(Todo) {
+  case list.any(todos, fn(existing) { existing.id == item.id }) {
+    True ->
+      list.map(todos, fn(existing) {
+        case existing.id == item.id {
+          True -> item
+          False -> existing
+        }
+      })
+    False -> list.append(todos, [item])
+  }
+}
+
+fn subscribe(api: api.Api) -> Effect(Msg) {
+  use dispatch <- effect.from
+  api.subscribe(api, fn(change) { dispatch(Changed(change)) })
+  |> promise.map(fn(reply) { dispatch(Subscribed(reply)) })
+  Nil
+}
+
+fn fetch(api: api.Api, revision: Int) -> Effect(Msg) {
+  client.effect(api.list_todos(api), ApiReturnedTodos(revision, _))
 }
 
 fn watch(api: api.Api) -> Effect(Msg) {
@@ -243,7 +350,7 @@ fn do_on_focus(callback: fn() -> Nil) -> Nil
 
 // VIEW ------------------------------------------------------------------------
 
-fn view(model: Model) -> Element(Msg) {
+pub fn view(model: Model) -> Element(Msg) {
   let remaining = list.count(model.todos, fn(item) { !item.done })
   let visible =
     list.filter(model.todos, fn(item) {
@@ -260,7 +367,11 @@ fn view(model: Model) -> Element(Msg) {
       view_connection(model.connection),
     ]),
     html.p([attribute.class("tagline")], [
-      text("Gleam + Lustre, talking to a Gleam Worker over Cap'n Web"),
+      text(case model.mode {
+        Baseline -> "Gleam + Lustre, talking to a Gleam Worker over Cap'n Web"
+        Live -> "Live subscriptions · changes arrive as typed data"
+        Server -> "Lustre server component · UI updates arrive as DOM patches"
+      }),
     ]),
     view_error(model.error),
     html.form([event.on_submit(fn(_) { UserSubmittedDraft })], [

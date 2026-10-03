@@ -1,9 +1,30 @@
 //// GENERATED (hand-written for now): codecs for shared data types.
 
-import starflame/plain.{type Plain}
 import gleam/dynamic/decode.{type Decoder}
+import starflame/plain.{type Plain}
 import todos/shared.{
-  type Todo, type TodoError, EmptyTitle, NotFound, TitleTooLong, Todo,
+  type Change, type Todo, type TodoError, CompletedCleared, EmptyTitle, NotFound,
+  Removed, Snapshot, TitleTooLong, Todo, Upsert,
+}
+
+pub fn change_decoder() -> Decoder(Change) {
+  use tag <- decode.field("$", decode.string)
+  case tag {
+    "Snapshot" -> {
+      use todos <- decode.field("todos", decode.list(todo_decoder()))
+      decode.success(Snapshot(todos))
+    }
+    "Upsert" -> {
+      use item <- decode.field("todo", todo_decoder())
+      decode.success(Upsert(item))
+    }
+    "Removed" -> {
+      use id <- decode.field("id", decode.int)
+      decode.success(Removed(id))
+    }
+    "CompletedCleared" -> decode.success(CompletedCleared)
+    _ -> decode.failure(CompletedCleared, "Change")
+  }
 }
 
 pub fn todo_to_plain(value: Todo) -> Plain {

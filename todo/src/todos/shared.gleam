@@ -11,3 +11,10 @@ pub type TodoError {
 }
 
 pub const max_title_length = 200
+
+pub type Change {
+  Snapshot(todos: List(Todo))
+  Upsert(item: Todo)
+  Removed(id: Int)
+  CompletedCleared
+}

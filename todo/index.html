@@ -30,6 +30,8 @@
       }
       * { box-sizing: border-box; }
       body { margin: 0; background: var(--bg); color: var(--text); }
+      nav { max-width: 34rem; margin: 1.5rem auto 0; padding: 0 1rem; display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; }
+      nav a { color: var(--muted); }
       .app { max-width: 34rem; margin: 3rem auto; padding: 0 1rem; }
       header { display: flex; align-items: baseline; justify-content: space-between; }
       h1 { margin: 0; font-size: 2.5rem; letter-spacing: -0.04em; }
@@ -63,6 +65,11 @@
     </style>
   </head>
   <body>
+    <nav aria-label="Compare sync approaches">
+      <a href="/">Refresh on focus</a>
+      <a href="/live">Live subscriptions</a>
+      <a href="/server">Server component</a>
+    </nav>
     <div id="app"></div>
     <script type="module" src="/main.ts"></script>
   </body>
