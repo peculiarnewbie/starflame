@@ -1,6 +1,6 @@
 //// Server-side runtime used by generated RPC dispatchers.
 
-import cf_gleam/plain.{type Plain}
+import starflame/plain.{type Plain}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type DecodeError, type Decoder}
 import gleam/javascript/promise.{type Promise}

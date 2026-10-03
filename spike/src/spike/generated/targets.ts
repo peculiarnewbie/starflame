@@ -4,7 +4,7 @@
 
 import { RpcTarget } from "capnweb";
 import * as server from "./server.mjs";
-import * as runtime from "../../../cf_gleam/cf_gleam/server.mjs";
+import * as runtime from "../../../starflame/starflame/server.mjs";
 
 export class Api extends RpcTarget {
   #context: runtime.Context$;

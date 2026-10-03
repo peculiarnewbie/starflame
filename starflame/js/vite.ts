@@ -15,7 +15,7 @@ import { pathToFileURL } from "node:url";
 import type { Plugin, ViteDevServer } from "vite";
 
 const SOURCE = /\.(gleam|mjs|js|ts)$/;
-const BUNDLE = "\0cf-gleam-bundle:";
+const BUNDLE = "\0starflame-bundle:";
 
 export function gleam(): Plugin {
   let root = process.cwd();
@@ -76,7 +76,7 @@ export function gleam(): Plugin {
   };
 
   return {
-    name: "cf-gleam",
+    name: "starflame",
     enforce: "pre",
 
     config() {

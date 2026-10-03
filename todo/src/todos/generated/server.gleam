@@ -1,7 +1,7 @@
 //// GENERATED (hand-written for now): RPC dispatchers called from targets.ts.
 
-import cf_gleam/plain.{type Plain}
-import cf_gleam/server.{type Context}
+import starflame/plain.{type Plain}
+import starflame/server.{type Context}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}

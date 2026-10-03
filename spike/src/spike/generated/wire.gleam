@@ -1,7 +1,7 @@
 //// GENERATED (hand-written for the spike): codecs for data types shared by
 //// client and server.
 
-import cf_gleam/plain.{type Plain}
+import starflame/plain.{type Plain}
 import gleam/dynamic/decode.{type Decoder}
 import spike/shared.{
   type ApiError, type Everything, type Point, type Role, type User, Admin,

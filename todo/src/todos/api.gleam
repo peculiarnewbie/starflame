@@ -1,8 +1,8 @@
 //// Every public function here is an RPC method.
 
-import cf_gleam/d1
-import cf_gleam/plain
-import cf_gleam/server.{type Context}
+import starflame/d1
+import starflame/plain
+import starflame/server.{type Context}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}

@@ -1,6 +1,6 @@
 //// The Lustre SPA.
 
-import cf_gleam/client.{type RpcError, Decode, Remote}
+import starflame/client.{type RpcError, Decode, Remote}
 import gleam/int
 import gleam/javascript/promise
 import gleam/list

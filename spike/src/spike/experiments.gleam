@@ -1,7 +1,7 @@
 //// End-to-end experiments: Gleam client stubs -> Cap'n Web over WebSocket ->
 //// Worker in Miniflare -> Gleam API. Driven by experiments/run.mjs.
 
-import cf_gleam/client.{Remote}
+import starflame/client.{Remote}
 import gleam/dict
 import gleam/int
 import gleam/io

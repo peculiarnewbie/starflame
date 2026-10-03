@@ -1,4 +1,4 @@
-name = "cf_gleam"
+name = "starflame"
 version = "0.1.0"
 target = "javascript"
 description = "Runtime for Gleam fullstack apps on Cloudflare Workers over Cap'n Web"

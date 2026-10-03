@@ -1,7 +1,7 @@
 //// GENERATED (hand-written for the spike): typed client stubs.
 
-import cf_gleam/client.{type RpcError, type Stub}
-import cf_gleam/plain
+import starflame/client.{type RpcError, type Stub}
+import starflame/plain
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}
 import gleam/option.{type Option}

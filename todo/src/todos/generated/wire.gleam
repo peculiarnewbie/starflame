@@ -1,6 +1,6 @@
 //// GENERATED (hand-written for now): codecs for shared data types.
 
-import cf_gleam/plain.{type Plain}
+import starflame/plain.{type Plain}
 import gleam/dynamic/decode.{type Decoder}
 import todos/shared.{
   type Todo, type TodoError, EmptyTitle, NotFound, TitleTooLong, Todo,

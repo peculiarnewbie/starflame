@@ -1,7 +1,7 @@
 //// GENERATED (hand-written for now): typed client stubs.
 
-import cf_gleam/client.{type RpcError, type Stub}
-import cf_gleam/plain
+import starflame/client.{type RpcError, type Stub}
+import starflame/plain
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}
 import todos/generated/wire

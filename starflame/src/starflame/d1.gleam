@@ -1,7 +1,7 @@
 //// Minimal D1 bindings.
 
-import cf_gleam/plain.{type Plain}
-import cf_gleam/server.{type Context}
+import starflame/plain.{type Plain}
+import starflame/server.{type Context}
 import gleam/dynamic.{type Dynamic}
 import gleam/javascript/promise.{type Promise}
 

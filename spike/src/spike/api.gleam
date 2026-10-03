@@ -1,7 +1,7 @@
 //// Every public function here is an RPC method. Types with function fields
 //// (like `Session`) are capabilities: they're passed by reference.
 
-import cf_gleam/server.{type Context}
+import starflame/server.{type Context}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option.{type Option, None, Some}

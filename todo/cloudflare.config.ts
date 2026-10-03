@@ -2,7 +2,7 @@ import { bindings, defineConfig } from "cf/config";
 
 export default defineConfig({
   worker: {
-    name: "cf-gleam-todo",
+    name: "starflame-todo",
     compatibilityDate: "2026-09-30",
     entrypoint: "./worker.ts",
     assets: {
@@ -10,7 +10,7 @@ export default defineConfig({
       runWorkerFirst: ["/rpc"],
     },
     env: {
-      DB: bindings.d1({ name: "cf-gleam-todo" }),
+      DB: bindings.d1({ name: "starflame-todo" }),
     },
   },
 });
