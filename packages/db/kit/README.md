@@ -51,7 +51,9 @@ Migrations are written to `migrations/NNNN_name.sql` for
   edited until the next migration is generated.
 - **Generated Gleam CRUD stays tied to the migration history.** Each migration
   writes the row and insert types, decoders, insert/get/delete functions, and
-  quoted column list from its snapshot. `codegen` rewrites the latest module;
-  `check` reports missing or edited generated code.
+  quoted column list from its snapshot, laid out by the installed
+  `gleam format`. `codegen` rewrites the latest module; `check` reports missing
+  or edited generated code. A Gleam upgrade that changes formatting makes
+  `check` ask for `codegen` once.
 
-Requires Node 22.13 or later for `node:sqlite`.
+Requires Node 22.13 or later for `node:sqlite`, and `gleam` on the `PATH`.

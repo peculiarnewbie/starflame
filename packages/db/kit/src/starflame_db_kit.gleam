@@ -351,7 +351,7 @@ fn check_module(
   case latest {
     None -> Error("No migrations yet; run generate first.")
     Some(latest) -> {
-      let expected = codegen.module(latest)
+      use expected <- result.try(codegen.module(latest))
       case simplifile.read(config.module) {
         Ok(found) if found == expected -> Ok(Nil)
         Ok(_) -> Error(config.module <> " is out of date; run codegen")
@@ -380,7 +380,8 @@ fn write_module(config: Config, latest: Snapshot) -> Result(Nil, String) {
             parent <> ": " <> simplifile.describe_error(error)
           })
       })
-      write_if_changed(path, codegen.module(latest), fn(path) {
+      use source <- result.try(codegen.module(latest))
+      write_if_changed(path, source, fn(path) {
         fn(error) { path <> ": " <> simplifile.describe_error(error) }
       })
     }

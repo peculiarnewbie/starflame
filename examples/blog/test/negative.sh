@@ -2,16 +2,18 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-examples="$(cd "$here/../.." && pwd)"
+packages="$(cd "$here/../../../packages" && pwd)"
+scratch_root="$(mktemp -d)"
+trap 'rm -rf "$scratch_root"' EXIT
 status=0
 
 for source in "$here"/../negative/*.gleam; do
   name="$(basename "$source" .gleam)"
-  scratch="$examples/.blog-negative-$name"
-  rm -rf "$scratch"
+  scratch="$scratch_root/$name"
   mkdir -p "$scratch/src/blog" "$scratch/build"
-  cp "$here/../gleam.toml" "$scratch/gleam.toml"
-  cp "$here/../manifest.toml" "$scratch/manifest.toml"
+  # Outside the repo, the relative path dependencies need to be absolute.
+  sed "s|\"../../packages|\"$packages|" "$here/../gleam.toml" >"$scratch/gleam.toml"
+  sed "s|\"../../packages|\"$packages|" "$here/../manifest.toml" >"$scratch/manifest.toml"
   cp -R "$here/../src/." "$scratch/src/"
   cp -R "$here/../build/packages" "$scratch/build/packages"
   cp "$source" "$scratch/src/blog/negative_$name.gleam"
@@ -34,7 +36,6 @@ for source in "$here"/../negative/*.gleam; do
     echo "$output" | tail -20
     status=1
   fi
-  rm -rf "$scratch"
 done
 
 exit "$status"

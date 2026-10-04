@@ -477,6 +477,70 @@ pub fn codegen_and_module_drift_test() {
   let assert Ok(_) = starflame_db_kit.run(v1(), config, ["check"])
 }
 
+/// Generated code must compile without warnings and pass `gleam format
+/// --check` for any valid schema, not just the blog's.
+pub fn codegen_edge_cases_compile_test() {
+  let schema =
+    s.schema([
+      // Nothing to insert but the rowid.
+      s.table("tokens", row: "Token")
+        |> s.int("id", [s.primary_key()]),
+      // Everything defaulted, a text key, keyword names, long names.
+      s.table(
+        "an_extremely_long_table_name_for_layout",
+        row: "ExtremelyLongRow",
+      )
+        |> s.text("slug", [s.primary_key()])
+        |> s.text("type", [s.default("plain")])
+        |> s.text("an_extremely_long_column_name_that_forces_wrapping", [
+          s.nullable(),
+        ])
+        |> s.float("score", [s.nullable(), s.default(1.5)])
+        |> s.bool("use", [s.default(True)])
+        |> s.timestamp("seen_at", [s.nullable(), s.default_now()])
+        |> s.int("token_id", [
+          s.nullable(),
+          s.references("tokens", "id", on_delete: s.SetNull),
+        ]),
+      // Short enough that the formatter could keep it on one line.
+      s.table("ab", row: "Ab")
+        |> s.int("id", [s.primary_key()])
+        |> s.text("a", [])
+        |> s.text("b", []),
+    ])
+  let config = workspace("codegen_edges")
+  let _ = generate(schema, config, ["init"])
+  let assert Ok(generated) = simplifile.read(config.module)
+
+  // A copy of starflame_db, which has every dependency generated code uses.
+  let root = "build/kit-test/codegen_edges/project"
+  let assert Ok(core) = simplifile.read("../core/gleam.toml")
+  let assert Ok(manifest) = simplifile.read("../core/manifest.toml")
+  let starflame = absolute("../../starflame")
+  let assert Ok(_) = simplifile.create_directory_all(root <> "/build")
+  let assert Ok(_) =
+    simplifile.write(
+      root <> "/gleam.toml",
+      string.replace(core, "\"../../starflame\"", "\"" <> starflame <> "\""),
+    )
+  let assert Ok(_) =
+    simplifile.write(
+      root <> "/manifest.toml",
+      string.replace(manifest, "\"../../starflame\"", "\"" <> starflame <> "\""),
+    )
+  let assert Ok(_) = simplifile.copy_directory("../core/src", root <> "/src")
+  let assert Ok(_) =
+    simplifile.copy_directory("build/packages", root <> "/build/packages")
+  let assert Ok(_) = simplifile.write(root <> "/src/generated.gleam", generated)
+
+  let assert Ok(_) =
+    shell(root, "gleam", ["format", "--check", "src/generated.gleam"])
+  case shell(root, "gleam", ["build", "--warnings-as-errors"]) {
+    Ok(_) -> Nil
+    Error(output) -> panic as output
+  }
+}
+
 pub fn self_reference_and_set_default_test() {
   let config = workspace("self")
   let categories = fn(check) {
@@ -584,6 +648,17 @@ fn rows(database: sqlite.Database, sql: String) -> List(String) {
 
 @external(javascript, "./starflame_db_kit_test_ffi.mjs", "row_text")
 fn row_text(row: Dynamic) -> String
+
+/// Runs a command in a directory; its combined output either way.
+@external(javascript, "./starflame_db_kit_test_ffi.mjs", "shell")
+fn shell(
+  directory: String,
+  command: String,
+  arguments: List(String),
+) -> Result(String, String)
+
+@external(javascript, "./starflame_db_kit_test_ffi.mjs", "absolute")
+fn absolute(path: String) -> String
 
 fn unwrap(result: Result(String, Nil)) -> String {
   let assert Ok(value) = result

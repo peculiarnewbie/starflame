@@ -6,7 +6,16 @@ import gleam/string
 import starflame_db/schema.{type Column, type Kind, type Table}
 import starflame_db_kit/snapshot.{type Snapshot}
 
-pub fn module(snapshot: Snapshot) -> String {
+/// The module's source, laid out by `gleam format` so that it stays stable
+/// under the app's own formatting check.
+pub fn module(snapshot: Snapshot) -> Result(String, String) {
+  format(source(snapshot))
+}
+
+@external(javascript, "../starflame_db_kit_ffi.mjs", "format")
+fn format(source: String) -> Result(String, String)
+
+fn source(snapshot: Snapshot) -> String {
   let tables = snapshot.canonical(snapshot.schema).tables
   let imports =
     case tables {
@@ -16,10 +25,13 @@ pub fn module(snapshot: Snapshot) -> String {
         "import gleam/javascript/promise",
         "import gleam/list",
         "import gleam/option",
-        "import gleam/string",
         "import starflame/d1",
       ]
     }
+    |> list.append(case list.any(tables, has_insertable) {
+      True -> ["import gleam/string"]
+      False -> []
+    })
     |> list.append(case list.any(tables, table_uses_timestamp) {
       True -> ["import gleam/time/timestamp"]
       False -> []
@@ -66,61 +78,24 @@ fn row_type(table: Table) -> String {
     list.map(table.columns, fn(column) {
       field_name(column.name) <> ": " <> column_type(column)
     })
-  let constructor = table.row <> "(" <> string.join(fields, ", ") <> ")"
-  let compact = "pub type " <> table.row <> " { " <> constructor <> " }"
-  case string.length(compact) <= 80 {
-    True -> compact
-    False ->
-      case string.length("  " <> constructor) <= 80 {
-        True -> "pub type " <> table.row <> " {\n  " <> constructor <> "\n}"
-        False ->
-          "pub type "
-          <> table.row
-          <> " {\n  "
-          <> table.row
-          <> "(\n"
-          <> string.join(
-            list.map(fields, fn(field) { "    " <> field <> "," }),
-            "\n",
-          )
-          <> "\n  )\n}"
-      }
-  }
+  custom_type(table.row, fields)
 }
 
 fn new_type(table: Table) -> String {
-  let columns = list.filter(table.columns, insertable)
-  let head = "New" <> table.row
-  case columns {
-    [] -> "pub type New" <> table.row <> " { " <> head <> " }"
-    _ -> {
-      let fields =
-        list.map(columns, fn(column) {
-          field_name(column.name) <> ": " <> insert_type(column)
-        })
-      let constructor = head <> "(" <> string.join(fields, ", ") <> ")"
-      let compact = "pub type New" <> table.row <> " { " <> constructor <> " }"
-      case string.length(compact) <= 80 {
-        True -> compact
-        False ->
-          case string.length("  " <> constructor) <= 80 {
-            True ->
-              "pub type New" <> table.row <> " {\n  " <> constructor <> "\n}"
-            False ->
-              "pub type New"
-              <> table.row
-              <> " {\n  "
-              <> head
-              <> "(\n"
-              <> string.join(
-                list.map(fields, fn(field) { "    " <> field <> "," }),
-                "\n",
-              )
-              <> "\n  )\n}"
-          }
-      }
-    }
+  let fields =
+    list.filter(table.columns, insertable)
+    |> list.map(fn(column) {
+      field_name(column.name) <> ": " <> insert_type(column)
+    })
+  custom_type("New" <> table.row, fields)
+}
+
+fn custom_type(name: String, fields: List(String)) -> String {
+  let constructor = case fields {
+    [] -> name
+    _ -> name <> "(" <> string.join(fields, ", ") <> ")"
   }
+  "pub type " <> name <> " {\n  " <> constructor <> "\n}"
 }
 
 fn columns_constant(table: Table) -> String {
@@ -144,15 +119,15 @@ fn decoder(table: Table) -> String {
       <> gleam_string(column.name)
       <> ", "
       <> column_decoder(column)
-      <> ")"
+      <> ")\n"
     })
   "pub fn "
   <> name
   <> "_decoder() -> decode.Decoder("
   <> table.row
   <> ") {\n"
-  <> string.join(fields, "\n")
-  <> "\n  decode.success("
+  <> string.concat(fields)
+  <> "  decode.success("
   <> table.row
   <> "("
   <> string.join(
@@ -165,43 +140,7 @@ fn decoder(table: Table) -> String {
 fn insert_function(table: Table) -> String {
   let row = table.row
   let name = snake_case(row)
-  let columns = list.filter(table.columns, insertable)
-  let values =
-    list.map(columns, fn(column) { "      " <> insert_value(column) })
-  let return_type = "promise.Promise(Result(" <> row <> ", d1.Error))"
-  let compact_signature =
-    "pub fn insert_"
-    <> name
-    <> "(db: d1.Database, new: New"
-    <> row
-    <> ") -> "
-    <> return_type
-    <> " {"
-  let signature = case string.length(compact_signature) <= 80 {
-    True -> compact_signature <> "\n"
-    False ->
-      "pub fn insert_"
-      <> name
-      <> "(\n  db: d1.Database,\n  new: New"
-      <> row
-      <> ",\n) -> "
-      <> return_type
-      <> " {\n"
-  }
-  let values_block = case columns {
-    [] -> "  let values = []\n"
-    _ ->
-      "  let values =\n    [\n"
-      <> string.join(values, ",\n")
-      <> ",\n    ]\n"
-      <> "    |> list.filter_map(fn(value) {\n"
-      <> "      case value {\n"
-      <> "        option.Some(value) -> Ok(value)\n"
-      <> "        option.None -> Error(Nil)\n"
-      <> "      }\n"
-      <> "    })\n"
-  }
-  let default_value =
+  let default_values =
     gleam_string(
       "INSERT INTO "
       <> quote_identifier(table.name)
@@ -210,98 +149,76 @@ fn insert_function(table: Table) -> String {
     <> " <> "
     <> name
     <> "_columns"
-  let default_branch = format_case_branch("[]", default_value)
-  let sql =
-    "  let sql = case values {\n"
-    <> default_branch
-    <> "\n    _ ->\n      "
-    <> gleam_string("INSERT INTO " <> quote_identifier(table.name) <> " (")
-    <> "\n      <> string.join(list.map(values, fn(value) { value.0 }), \", \")"
-    <> "\n      <> \") VALUES (\""
-    <> "\n      <> string.join(list.map(values, fn(_) { \"?\" }), \", \")"
-    <> "\n      <> \") RETURNING \""
-    <> "\n      <> "
-    <> name
-    <> "_columns\n  }\n"
-  let all =
-    "  d1.all(db, sql, list.map(values, fn(value) { value.1 }), "
-    <> name
-    <> "_decoder())"
-  let all_call = case string.length(all) <= 80 {
-    True -> all <> "\n"
-    False ->
-      "  d1.all(\n    db,\n    sql,\n    list.map(values, fn(value) { value.1 }),\n    "
+  let body = case list.filter(table.columns, insertable) {
+    // Nothing to insert but the rowid, so there is nothing to read from `new`.
+    [] ->
+      "  d1.all(db, " <> default_values <> ", [], " <> name <> "_decoder())\n"
+    columns ->
+      "  let values =\n    ["
+      <> string.join(list.map(columns, insert_value), ", ")
+      <> "]\n"
+      <> "    |> list.filter_map(fn(value) {\n"
+      <> "      case value {\n"
+      <> "        option.Some(value) -> Ok(value)\n"
+      <> "        option.None -> Error(Nil)\n"
+      <> "      }\n"
+      <> "    })\n"
+      <> "  let sql = case values {\n"
+      <> "    [] -> "
+      <> default_values
+      <> "\n    _ -> "
+      <> gleam_string("INSERT INTO " <> quote_identifier(table.name) <> " (")
+      <> " <> string.join(list.map(values, fn(value) { value.0 }), \", \")"
+      <> " <> \") VALUES (\""
+      <> " <> string.join(list.map(values, fn(_) { \"?\" }), \", \")"
+      <> " <> \") RETURNING \" <> "
       <> name
-      <> "_decoder(),\n  )\n"
+      <> "_columns\n  }\n"
+      <> "  d1.all(db, sql, list.map(values, fn(value) { value.1 }), "
+      <> name
+      <> "_decoder())\n"
   }
-  signature
-  <> values_block
-  <> sql
-  <> all_call
+  let new = case has_insertable(table) {
+    True -> "new"
+    False -> "_new"
+  }
+  "pub fn insert_"
+  <> name
+  <> "(db: d1.Database, "
+  <> new
+  <> ": New"
+  <> row
+  <> ") -> promise.Promise(Result("
+  <> row
+  <> ", d1.Error)) {\n"
+  <> body
   <> "  |> promise.map(fn(result) {\n"
   <> "    case result {\n"
   <> "      Ok([row]) -> Ok(row)\n"
-  <> "      Ok(rows) ->\n"
-  <> "        Error(\n"
-  <> "          d1.DecodeError([\n"
-  <> "            decode.DecodeError(\n"
-  <> "              \"one row\",\n"
-  <> "              int.to_string(list.length(rows)) <> \" rows\",\n"
-  <> "              [],\n"
-  <> "            ),\n"
-  <> "          ]),\n"
-  <> "        )\n"
+  <> "      Ok(rows) -> Error(d1.DecodeError([decode.DecodeError(\"one row\", int.to_string(list.length(rows)) <> \" rows\", [])]))\n"
   <> "      Error(error) -> Error(error)\n"
   <> "    }\n"
   <> "  })\n}"
-}
-
-fn format_case_branch(pattern: String, expression: String) -> String {
-  let compact = "    " <> pattern <> " -> " <> expression
-  case string.length(compact) <= 80 {
-    True -> compact
-    False -> "    " <> pattern <> " ->\n      " <> expression
-  }
 }
 
 fn get_function(table: Table) -> String {
   let name = snake_case(table.row)
   let key = primary_key(table)
   let key_name = field_name(key.name)
-  let key_type = base_type(key.kind)
-  let return_type =
-    "promise.Promise(Result(option.Option(" <> table.row <> "), d1.Error))"
   let columns =
     table.columns
     |> list.map(fn(column) { quote_identifier(column.name) })
     |> string.join(", ")
-  let compact_signature =
-    "pub fn get_"
-    <> name
-    <> "(db: d1.Database, "
-    <> key_name
-    <> ": "
-    <> key_type
-    <> ") -> "
-    <> return_type
-    <> " {"
-  let signature = case string.length(compact_signature) <= 80 {
-    True -> compact_signature <> "\n"
-    False ->
-      "pub fn get_"
-      <> name
-      <> "(\n  db: d1.Database,\n  "
-      <> key_name
-      <> ": "
-      <> key_type
-      <> ",\n) -> "
-      <> return_type
-      <> " {\n"
-  }
-  signature
-  <> "  d1.all(\n"
-  <> "    db,\n"
-  <> "    "
+  "pub fn get_"
+  <> name
+  <> "(db: d1.Database, "
+  <> key_name
+  <> ": "
+  <> base_type(key.kind)
+  <> ") -> promise.Promise(Result(option.Option("
+  <> table.row
+  <> "), d1.Error)) {\n"
+  <> "  d1.all(db, "
   <> gleam_string(
     "SELECT "
     <> columns
@@ -311,14 +228,11 @@ fn get_function(table: Table) -> String {
     <> quote_identifier(key.name)
     <> " = ?",
   )
-  <> ",\n"
-  <> "    ["
+  <> ", ["
   <> encode(key.kind, key_name)
-  <> "],\n"
-  <> "    "
+  <> "], "
   <> name
-  <> "_decoder(),\n"
-  <> "  )\n"
+  <> "_decoder())\n"
   <> "  |> promise.map(fn(result) {\n"
   <> "    case result {\n"
   <> "      Ok([row, ..]) -> Ok(option.Some(row))\n"
@@ -332,53 +246,24 @@ fn delete_function(table: Table) -> String {
   let name = snake_case(table.row)
   let key = primary_key(table)
   let key_name = field_name(key.name)
-  let key_type = base_type(key.kind)
-  let return_type = "promise.Promise(Result(Bool, d1.Error))"
-  let compact_signature =
-    "pub fn delete_"
-    <> name
-    <> "(db: d1.Database, "
-    <> key_name
-    <> ": "
-    <> key_type
-    <> ") -> "
-    <> return_type
-    <> " {"
-  let signature = case string.length(compact_signature) <= 80 {
-    True -> compact_signature <> "\n"
-    False ->
-      "pub fn delete_"
-      <> name
-      <> "(\n  db: d1.Database,\n  "
-      <> key_name
-      <> ": "
-      <> key_type
-      <> ",\n) -> "
-      <> return_type
-      <> " {\n"
-  }
   let query =
     "DELETE FROM "
     <> quote_identifier(table.name)
     <> " WHERE "
     <> quote_identifier(key.name)
     <> " = ?"
-  let call =
-    "  d1.run(db, "
-    <> gleam_string(query)
-    <> ", ["
-    <> encode(key.kind, key_name)
-    <> "])"
-  signature
-  <> case string.length(call) <= 80 {
-    True -> call <> "\n"
-    False ->
-      "  d1.run(\n    db,\n    "
-      <> gleam_string(query)
-      <> ",\n    ["
-      <> encode(key.kind, key_name)
-      <> "],\n  )\n"
-  }
+  "pub fn delete_"
+  <> name
+  <> "(db: d1.Database, "
+  <> key_name
+  <> ": "
+  <> base_type(key.kind)
+  <> ") -> promise.Promise(Result(Bool, d1.Error)) {\n"
+  <> "  d1.run(db, "
+  <> gleam_string(query)
+  <> ", ["
+  <> encode(key.kind, key_name)
+  <> "])\n"
   <> "  |> promise.map(fn(result) {\n"
   <> "    case result {\n"
   <> "      Ok(changes) -> Ok(changes > 0)\n"
@@ -391,33 +276,20 @@ fn insert_value(column: Column) -> String {
   let field = field_name(column.name)
   let column_sql = gleam_string(quote_identifier(column.name))
   case column.default {
-    Some(_) -> {
-      let given =
-        "option.Some(#("
-        <> column_sql
-        <> ", "
-        <> insert_encoding(column, "value")
-        <> "))"
+    Some(_) ->
       "case new."
       <> field
-      <> " {\n        runtime.UseDefault -> option.None\n"
-      <> format_case_arm("        ", "runtime.Given(value)", given)
-      <> "\n      }"
-    }
+      <> " {\n runtime.UseDefault -> option.None\n runtime.Given(value) -> option.Some(#("
+      <> column_sql
+      <> ", "
+      <> insert_encoding(column, "value")
+      <> "))\n}"
     None ->
       "option.Some(#("
       <> column_sql
       <> ", "
       <> insert_encoding(column, "new." <> field)
       <> "))"
-  }
-}
-
-fn format_case_arm(indent: String, pattern: String, value: String) -> String {
-  let compact = indent <> pattern <> " -> " <> value
-  case string.length(compact) <= 80 {
-    True -> compact
-    False -> indent <> pattern <> " ->\n" <> indent <> "  " <> value
   }
 }
 
@@ -502,8 +374,14 @@ fn table_uses_timestamp(table: Table) -> Bool {
 
 fn table_uses_runtime(table: Table) -> Bool {
   list.any(table.columns, fn(column) {
-    column.kind == schema.TimestampKind || column.default != None
+    column.kind == schema.TimestampKind
+    || insertable(column)
+    && column.default != None
   })
+}
+
+fn has_insertable(table: Table) -> Bool {
+  list.any(table.columns, insertable)
 }
 
 const reserved_words = "as assert auto case const delegate derive echo else fn if implement import let macro opaque panic pub test todo type use"
