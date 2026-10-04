@@ -1,0 +1,7 @@
+{
+  "name": "starflame-bench-sveltekit",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "compatibility_date": "2026-09-30",
+  "assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
+  "d1_databases": [{ "binding": "DB", "database_name": "bench", "database_id": "local" }]
+}

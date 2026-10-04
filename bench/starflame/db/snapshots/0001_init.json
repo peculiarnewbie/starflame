@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "dialect": "d1",
+  "id": "0001_init",
+  "parent": "",
+  "checksum": "df32f3d14df61cd83b75bd0f815e4ea05e94f6ca00b4eb89b6d5080f9e26bfee",
+  "custom": false,
+  "tables": [
+    {
+      "name": "todos",
+      "row": "Todo",
+      "columns": [
+        {
+          "name": "id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "title",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "done",
+          "kind": "bool",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "literal": "0"
+          },
+          "references": null
+        }
+      ],
+      "indexes": [],
+      "checks": []
+    }
+  ]
+}
