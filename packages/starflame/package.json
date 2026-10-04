@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "gleam build"
+    "build": "gleam build",
+    "test": "gleam build && node test/d1.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "miniflare": "5.20261001.0-alpha"
   }
 }

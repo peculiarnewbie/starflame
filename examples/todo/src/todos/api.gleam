@@ -1,12 +1,9 @@
 //// Every public function here is an RPC method.
 
 import starflame/d1
-import starflame/plain
 import starflame/server.{type Context}
-import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}
-import gleam/list
 import gleam/string
 import todos/shared.{
   type Todo, type TodoError, EmptyTitle, NotFound, TitleTooLong, Todo,
@@ -15,12 +12,13 @@ import todos/shared.{
 
 pub fn list_todos(context: Context) -> Promise(List(Todo)) {
   use db <- with_db(context)
-  use rows <- promise.map(d1.all(
+  use todos <- or_reject(d1.all(
     db,
     "SELECT id, title, done FROM todos ORDER BY id",
     [],
+    todo_decoder(),
   ))
-  decode_rows(rows)
+  todos
 }
 
 pub fn add_todo(context: Context, title: String) -> Promise(Result(Todo, TodoError)) {
@@ -31,12 +29,13 @@ pub fn add_todo(context: Context, title: String) -> Promise(Result(Todo, TodoErr
       promise.resolve(Error(TitleTooLong(max_title_length)))
     _ -> {
       use db <- with_db(context)
-      use rows <- promise.map(d1.all(
+      use todos <- or_reject(d1.all(
         db,
         "INSERT INTO todos (title) VALUES (?) RETURNING id, title, done",
-        [plain.string(title)],
+        [d1.string(title)],
+        todo_decoder(),
       ))
-      single(rows, 0)
+      single(todos, 0)
     }
   }
 }
@@ -47,18 +46,19 @@ pub fn set_done(
   done: Bool,
 ) -> Promise(Result(Todo, TodoError)) {
   use db <- with_db(context)
-  use rows <- promise.map(d1.all(
+  use todos <- or_reject(d1.all(
     db,
     "UPDATE todos SET done = ? WHERE id = ? RETURNING id, title, done",
-    [plain.bool(done), plain.int(id)],
+    [d1.bool(done), d1.int(id)],
+    todo_decoder(),
   ))
-  single(rows, id)
+  single(todos, id)
 }
 
 pub fn delete_todo(context: Context, id: Int) -> Promise(Result(Nil, TodoError)) {
   use db <- with_db(context)
-  use changes <- promise.map(d1.run(db, "DELETE FROM todos WHERE id = ?", [
-    plain.int(id),
+  use changes <- or_reject(d1.run(db, "DELETE FROM todos WHERE id = ?", [
+    d1.int(id),
   ]))
   case changes {
     0 -> Error(NotFound(id))
@@ -69,7 +69,8 @@ pub fn delete_todo(context: Context, id: Int) -> Promise(Result(Nil, TodoError))
 /// Returns how many todos were removed.
 pub fn clear_completed(context: Context) -> Promise(Int) {
   use db <- with_db(context)
-  d1.run(db, "DELETE FROM todos WHERE done = 1", [])
+  use changes <- or_reject(d1.run(db, "DELETE FROM todos WHERE done = 1", []))
+  changes
 }
 
 // DATABASE --------------------------------------------------------------------
@@ -79,7 +80,7 @@ fn with_db(
   next: fn(d1.Database) -> Promise(a),
 ) -> Promise(a) {
   let db = d1.database(context, "DB")
-  use _ <- promise.await(
+  use setup <- promise.await(
     d1.setup(db, [
       "CREATE TABLE IF NOT EXISTS todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,22 +89,34 @@ fn with_db(
       )",
     ]),
   )
-  next(db)
+  case setup {
+    Ok(Nil) -> next(db)
+    Error(error) -> panic as d1.describe(error)
+  }
 }
 
-fn single(rows: List(Dynamic), id: Int) -> Result(Todo, TodoError) {
-  case decode_rows(rows) {
+/// These methods don't return database errors, so a failure rejects the call.
+fn or_reject(
+  query: Promise(Result(a, d1.Error)),
+  next: fn(a) -> b,
+) -> Promise(b) {
+  use result <- promise.map(query)
+  case result {
+    Ok(value) -> next(value)
+    Error(error) -> panic as d1.describe(error)
+  }
+}
+
+fn single(todos: List(Todo), id: Int) -> Result(Todo, TodoError) {
+  case todos {
     [item] -> Ok(item)
     _ -> Error(NotFound(id))
   }
 }
 
-fn decode_rows(rows: List(Dynamic)) -> List(Todo) {
-  let row = {
-    use id <- decode.field("id", decode.int)
-    use title <- decode.field("title", decode.string)
-    use done <- decode.field("done", decode.int)
-    decode.success(Todo(id:, title:, done: done == 1))
-  }
-  list.filter_map(rows, decode.run(_, row))
+fn todo_decoder() -> decode.Decoder(Todo) {
+  use id <- decode.field("id", d1.int_decoder())
+  use title <- decode.field("title", decode.string)
+  use done <- decode.field("done", d1.bool_decoder())
+  decode.success(Todo(id:, title:, done:))
 }

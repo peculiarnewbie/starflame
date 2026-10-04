@@ -222,7 +222,14 @@ importers:
         specifier: ^8.3.2
         version: 8.3.2(@types/node@24.19.1)(esbuild@0.28.2)
 
-  packages/starflame: {}
+  packages/starflame:
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      miniflare:
+        specifier: 5.20261001.0-alpha
+        version: 5.20261001.0-alpha(@types/node@24.19.1)
 
   packages/vite:
     devDependencies:
