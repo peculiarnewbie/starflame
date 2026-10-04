@@ -18,6 +18,13 @@ pub fn validate(schema: Schema) -> Result(Schema, List(String)) {
     list.flatten([
       duplicates(tables, "table"),
       duplicates(list.map(schema.tables, fn(table) { table.row }), "row type"),
+      duplicates(
+        list.map(schema.tables, fn(table) { snake_case(table.row) }),
+        "generated function name",
+      ),
+      list.flat_map(schema.tables, fn(table) {
+        row_name_collisions(table, schema.tables)
+      }),
       // Index names share one namespace with tables.
       duplicates(list.append(tables, indexes), "table or index name"),
       list.flat_map(schema.tables, validate_table(schema, _)),
@@ -39,6 +46,10 @@ fn validate_table(schema: Schema, table: Table) -> List(String) {
       _ -> []
     },
     duplicates(columns, table.name <> " column"),
+    duplicates(
+      list.map(columns, generated_field_name),
+      table.name <> " generated field",
+    ),
     list.flat_map(columns, identifier),
     case keys {
       [_] -> []
@@ -68,6 +79,36 @@ fn validate_table(schema: Schema, table: Table) -> List(String) {
         }),
       ])
     }),
+  ])
+}
+
+fn row_name_collisions(table: Table, tables: List(Table)) -> List(String) {
+  list.flatten([
+    case
+      list.find(tables, fn(other) {
+        other.name != table.name && table.row == "New" <> other.row
+      })
+    {
+      Ok(other) -> [
+        table.name
+        <> ": row type "
+        <> table.row
+        <> " conflicts with generated insert type New"
+        <> other.row
+        <> " from "
+        <> other.name,
+      ]
+      Error(Nil) -> []
+    },
+    case list.contains(generated_reserved_types, table.row) {
+      True -> [
+        table.name
+        <> ": row type "
+        <> table.row
+        <> " is reserved by code generation",
+      ]
+      False -> []
+    },
   ])
 }
 
@@ -185,6 +226,37 @@ fn type_name(table: String, name: String) -> List(String) {
     True -> []
     False -> [table <> ": row type " <> name <> " must be UpperCamelCase"]
   }
+}
+
+const generated_reserved_types = [
+  "Option", "Promise", "Timestamp", "Decoder", "Database", "Defaulted",
+  "UseDefault", "Given", "Result", "Ok", "Error", "Nil", "Bool", "Int", "Float",
+  "String", "List",
+]
+
+const generated_reserved_words = [
+  "as", "assert", "auto", "case", "const", "delegate", "derive", "echo", "else",
+  "fn", "if", "implement", "import", "let", "macro", "opaque", "panic", "pub",
+  "test", "todo", "type", "use",
+]
+
+fn generated_field_name(name: String) -> String {
+  case list.contains(generated_reserved_words, name) {
+    True -> name <> "_"
+    False -> name
+  }
+}
+
+fn snake_case(name: String) -> String {
+  name
+  |> string.to_graphemes
+  |> list.index_map(fn(char, index) {
+    case index > 0 && string.contains("ABCDEFGHIJKLMNOPQRSTUVWXYZ", char) {
+      True -> "_" <> string.lowercase(char)
+      False -> string.lowercase(char)
+    }
+  })
+  |> string.join("")
 }
 
 fn duplicates(names: List(String), what: String) -> List(String) {

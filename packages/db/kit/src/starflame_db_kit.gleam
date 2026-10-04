@@ -9,7 +9,13 @@
 //// import starflame_db_kit
 ////
 //// pub fn main() {
-////   starflame_db_kit.main(schema.schema())
+////   starflame_db_kit.main(
+////     schema.schema(),
+////     starflame_db_kit.Config(
+////       ..starflame_db_kit.default_config(),
+////       module: "src/db.gleam",
+////     ),
+////   )
 //// }
 //// ```
 ////
@@ -18,6 +24,7 @@
 //// gleam run -m db_kit -- generate rename_name --rename users.name=display_name
 //// gleam run -m db_kit -- generate drop_bio --allow-destructive
 //// gleam run -m db_kit -- generate backfill_slugs --custom
+//// gleam run -m db_kit -- codegen
 //// gleam run -m db_kit -- check
 //// ```
 ////
@@ -28,29 +35,34 @@
 import argv
 import gleam/io
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import simplifile
 import starflame_db/schema.{type Schema, Schema}
+import starflame_db_kit/codegen
 import starflame_db_kit/history.{type Migration}
 import starflame_db_kit/introspect
 import starflame_db_kit/plan.{type Options, Options, Rename}
-import starflame_db_kit/snapshot.{Snapshot}
+import starflame_db_kit/snapshot.{type Snapshot, Snapshot}
 import starflame_db_kit/sqlite
 import starflame_db_kit/validate
 
 pub type Config {
-  Config(migrations_dir: String, snapshots_dir: String)
+  Config(migrations_dir: String, snapshots_dir: String, module: String)
 }
 
 pub fn default_config() -> Config {
-  Config(migrations_dir: "migrations", snapshots_dir: "db/snapshots")
+  Config(
+    migrations_dir: "migrations",
+    snapshots_dir: "db/snapshots",
+    module: "",
+  )
 }
 
 /// Runs the command in the process arguments and exits non-zero on failure.
-pub fn main(schema: Schema) -> Nil {
-  case run(schema, default_config(), argv.load().arguments) {
+pub fn main(schema: Schema, config: Config) -> Nil {
+  case run(schema, config, argv.load().arguments) {
     Ok(output) -> io.println(output)
     Error(error) -> {
       io.println_error(error)
@@ -73,6 +85,7 @@ pub fn run(
       ))
       generate(schema, config, name, options, custom)
     }
+    ["codegen"] -> codegen_command(config)
     ["check"] -> check(schema, config)
     _ -> Error(usage)
   }
@@ -81,6 +94,7 @@ pub fn run(
 const usage = "Usage:
   generate <name> [--rename table.old=new]... [--allow-destructive]
   generate <name> --custom
+  codegen
   check"
 
 fn parse_flags(
@@ -192,6 +206,7 @@ fn generate(
     list.try_each(list.append(history, [new]), write(config, _))
     |> result.map_error(fn(error) { "Couldn't write files: " <> error }),
   )
+  use _ <- result.try(write_module(config, new_snapshot))
   Ok(
     string.join(
       [
@@ -291,12 +306,84 @@ fn check(schema: Schema, config: Config) -> Result(String, String) {
     Error(Nil) -> Schema([])
   }
   case snapshot.canonical(latest) == snapshot.canonical(schema) {
-    True ->
+    False -> Error("The schema has changes without a migration. Run generate.")
+    True -> {
+      let module_check = case config.module {
+        "" -> Ok(Nil)
+        _ ->
+          list.last(history)
+          |> option.from_result
+          |> option.map(fn(migration) { migration.snapshot })
+          |> check_module(config, _)
+      }
+      use _ <- result.try(module_check)
       Ok(
         string.inspect(list.length(history))
-        <> " migrations verified; the schema matches the latest snapshot.",
+        <> " migrations verified; the schema matches the latest snapshot."
+        <> case config.module {
+          "" -> ""
+          _ -> " " <> config.module <> " is up to date."
+        },
       )
-    False -> Error("The schema has changes without a migration. Run generate.")
+    }
+  }
+}
+
+fn codegen_command(config: Config) -> Result(String, String) {
+  use history <- result.try(load(config))
+  case list.last(history) {
+    Error(Nil) -> Error("No migrations yet; run generate first.")
+    Ok(migration) ->
+      case config.module {
+        "" -> Error("Set Config.module to generate a module.")
+        _ -> {
+          use _ <- result.try(write_module(config, migration.snapshot))
+          Ok("Wrote " <> config.module)
+        }
+      }
+  }
+}
+
+fn check_module(
+  config: Config,
+  latest: Option(Snapshot),
+) -> Result(Nil, String) {
+  case latest {
+    None -> Error("No migrations yet; run generate first.")
+    Some(latest) -> {
+      let expected = codegen.module(latest)
+      case simplifile.read(config.module) {
+        Ok(found) if found == expected -> Ok(Nil)
+        Ok(_) -> Error(config.module <> " is out of date; run codegen")
+        Error(_) -> Error(config.module <> " is missing; run codegen")
+      }
+    }
+  }
+}
+
+fn write_module(config: Config, latest: Snapshot) -> Result(Nil, String) {
+  case config.module {
+    "" -> Ok(Nil)
+    path -> {
+      let parent =
+        path
+        |> string.split("/")
+        |> list.reverse
+        |> list.drop(1)
+        |> list.reverse
+        |> string.join("/")
+      use _ <- result.try(case parent {
+        "" -> Ok(Nil)
+        _ ->
+          simplifile.create_directory_all(parent)
+          |> result.map_error(fn(error) {
+            parent <> ": " <> simplifile.describe_error(error)
+          })
+      })
+      write_if_changed(path, codegen.module(latest), fn(path) {
+        fn(error) { path <> ": " <> simplifile.describe_error(error) }
+      })
+    }
   }
 }
 

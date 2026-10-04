@@ -10,7 +10,13 @@ import app/schema
 import starflame_db_kit
 
 pub fn main() {
-  starflame_db_kit.main(schema.schema())
+  starflame_db_kit.main(
+    schema.schema(),
+    starflame_db_kit.Config(
+      ..starflame_db_kit.default_config(),
+      module: "src/app/db.gleam",
+    ),
+  )
 }
 ```
 
@@ -19,6 +25,7 @@ gleam run -m db_kit -- generate add_posts
 gleam run -m db_kit -- generate rename_name --rename users.name=display_name
 gleam run -m db_kit -- generate drop_bio --allow-destructive
 gleam run -m db_kit -- generate backfill_slugs --custom
+gleam run -m db_kit -- codegen
 gleam run -m db_kit -- check
 ```
 
@@ -42,5 +49,9 @@ Migrations are written to `migrations/NNNN_name.sql` for
   histories that diverged on two branches, custom migrations that change the
   schema, and schema changes without a migration. A custom migration can be
   edited until the next migration is generated.
+- **Generated Gleam CRUD stays tied to the migration history.** Each migration
+  writes the row and insert types, decoders, insert/get/delete functions, and
+  quoted column list from its snapshot. `codegen` rewrites the latest module;
+  `check` reports missing or edited generated code.
 
 Requires Node 22.13 or later for `node:sqlite`.
