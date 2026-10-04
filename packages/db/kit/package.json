@@ -1,0 +1,12 @@
+{
+  "name": "@starflame/db-kit",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "gleam build",
+    "test": "gleam test"
+  }
+}

@@ -1,0 +1,8 @@
+name = "starflame_db"
+version = "0.1.0"
+target = "javascript"
+description = "Gleam schemas for Cloudflare D1"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_time = ">= 1.0.0 and < 2.0.0"

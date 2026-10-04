@@ -1,0 +1,15 @@
+name = "starflame_db_kit"
+version = "0.1.0"
+target = "javascript"
+description = "Migrations for starflame_db schemas on Cloudflare D1"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+starflame_db = { path = "../core" }
+gleam_json = ">= 3.0.0 and < 4.0.0"
+gleam_crypto = ">= 1.5.0 and < 2.0.0"
+simplifile = ">= 2.3.0 and < 3.0.0"
+argv = ">= 1.0.0 and < 2.0.0"
+
+[dev_dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

@@ -1,0 +1,8 @@
+{
+  "name": "@starflame/db",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "gleam build"
+  }
+}
