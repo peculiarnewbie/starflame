@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "dialect": "d1",
+  "id": "0005_check",
+  "parent": "5fc94c37a541d229",
+  "checksum": "279c92fdc6475343f02387e5c7adfadee6e80d45f3166921ec62cdb893ecc910",
+  "custom": false,
+  "tables": [
+    {
+      "name": "comments",
+      "row": "Comment",
+      "columns": [
+        {
+          "name": "id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "post_id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": {
+            "table": "posts",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        {
+          "name": "editor_id",
+          "kind": "int",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": {
+            "table": "users",
+            "column": "id",
+            "on_delete": "SET NULL"
+          }
+        },
+        {
+          "name": "body",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        }
+      ],
+      "indexes": [],
+      "checks": []
+    },
+    {
+      "name": "posts",
+      "row": "Post",
+      "columns": [
+        {
+          "name": "id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "user_id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": {
+            "table": "users",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        {
+          "name": "title",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "slug",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "literal": "'pending'"
+          },
+          "references": null
+        },
+        {
+          "name": "body",
+          "kind": "text",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "literal": "''"
+          },
+          "references": null
+        },
+        {
+          "name": "type",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "literal": "'article'"
+          },
+          "references": null
+        },
+        {
+          "name": "rating",
+          "kind": "float",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        }
+      ],
+      "indexes": [
+        {
+          "name": "posts_user_idx",
+          "columns": ["user_id"],
+          "unique": false
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "users",
+      "row": "User",
+      "columns": [
+        {
+          "name": "id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "email",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "display_name",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "admin",
+          "kind": "bool",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "literal": "0"
+          },
+          "references": null
+        },
+        {
+          "name": "created_at",
+          "kind": "timestamp",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "expression": "unixepoch()"
+          },
+          "references": null
+        },
+        {
+          "name": "bio",
+          "kind": "text",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        }
+      ],
+      "indexes": [
+        {
+          "name": "users_name_idx",
+          "columns": ["display_name"],
+          "unique": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "users_display_name_nonempty",
+          "sql": "length(display_name) > 0"
+        },
+        {
+          "name": "users_email_at",
+          "sql": "instr(email, '@') > 1"
+        }
+      ]
+    }
+  ]
+}
