@@ -15,5 +15,13 @@ sources and FFI files during development, and bundles browser imports of Gleam
 output to avoid a deep module-request waterfall. Worker imports keep using the
 individual compiled modules.
 
+When `gleam.toml` lists `starflame_rpc_kit`, the dev server also regenerates
+the RPC code whenever the API module or a module it imports changes. If the
+API is invalid, it prints the kit's error and keeps the previous code. A
+production build checks the generated code instead, and fails if it's out of
+date rather than changing sources. Pass `gleam({ rpc: false })` to turn this
+off, or `gleam({ rpc: { api: "todos/rpc", out: "todos/rpc_generated" } })`
+for the kit's `--api` and `--out`.
+
 Run `pnpm build` to produce ESM and TypeScript declarations in `dist/`.
 `pnpm pack` builds and packages this library without publishing it.
