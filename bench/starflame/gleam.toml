@@ -11,3 +11,4 @@ starflame_db = { path = "../../packages/db/core" }
 
 [dev_dependencies]
 starflame_db_kit = { path = "../../packages/db/kit" }
+starflame_rpc_kit = { path = "../../packages/rpc/kit" }

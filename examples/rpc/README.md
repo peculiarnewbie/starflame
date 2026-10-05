@@ -13,4 +13,5 @@ pnpm test
 
 Or run `pnpm exp` from this directory. The Gleam package retains the internal
 name `spike`; it consumes the runtime from `../../packages/starflame`.
-The codecs and dispatchers in `src/spike/generated/` are hand-written.
+`src/spike/generated/` comes from `src/spike/api.gleam`; run `pnpm rpc` after
+changing the API. `pnpm exp` fails if the generated code is out of date.

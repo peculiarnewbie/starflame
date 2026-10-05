@@ -5,17 +5,18 @@ import gleam/dynamic/decode
 import gleam/json
 import lustre
 import lustre/server_component
+import starflame/client.{type Stub} as _
 import todos/client
 import todos/generated/client as api
 import todos/generated/wire
 
 pub fn start(
-  stub: Dynamic,
+  stub: Stub,
   emit: fn(String) -> Nil,
 ) -> lustre.Runtime(client.Msg) {
   let app =
     lustre.application(
-      fn(_) { client.init_with_api(api.from_dynamic(stub), client.Server) },
+      fn(_) { client.init_with_api(api.from_stub(stub), client.Server) },
       client.update,
       client.view,
     )

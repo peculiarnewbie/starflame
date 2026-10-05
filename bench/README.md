@@ -31,7 +31,7 @@ must be safe integers, and every todo field must have the right type.
 
 | Target | Server | Client |
 | --- | --- | --- |
-| `starflame-ws` | [Starflame](starflame): Gleam API, wire codecs and the `starflame_db` generated module behind a Cap'n Web target | Cap'n Web WebSocket session |
+| `starflame-ws` | [Starflame](starflame): a Gleam API, with RPC code from `starflame_rpc_kit` and the D1 module from `starflame_db_kit` | Cap'n Web WebSocket session |
 | `starflame-http` | the same | Cap'n Web HTTP batch, one POST per call |
 | `capnweb-ws` | [Cap'n Web](capnweb) in plain TypeScript with the same methods | Cap'n Web WebSocket session |
 | `capnweb-http` | the same | Cap'n Web HTTP batch |

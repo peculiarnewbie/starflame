@@ -62,4 +62,7 @@ pnpm smoke https://your-worker.workers.dev
 `starflame-todo`, binds the D1 database of the same name as `DB`, and enables
 Worker observability. The application creates its table on first use.
 
-The RPC codecs and stubs in `src/todos/generated/` are hand-written.
+`src/todos/generated/` comes from `src/todos/api.gleam`. `pnpm dev` regenerates
+it as the API changes, `pnpm build` fails if it's out of date, and `pnpm rpc`
+regenerates it by hand. `TodoRoom` in `room.ts` wraps the generated target to order
+writes and broadcast changes, and serves `subscribe` itself.

@@ -1,4 +1,4 @@
-// GENERATED (hand-written for now): the Worker entrypoint.
+// The Worker entrypoint: RPC goes to the room's Durable Object.
 
 export { TodoRoom } from "./room.ts";
 

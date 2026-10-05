@@ -1,7 +1,6 @@
 //// Every public function here is an RPC method. Types with function fields
 //// (like `Session`) are capabilities: they're passed by reference.
 
-import starflame/server.{type Context}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -9,6 +8,7 @@ import spike/shared.{
   type ApiError, type Everything, type Role, type User, Admin, Guest, Invalid,
   Member, NotFound, User,
 }
+import starflame/server.{type Context}
 
 pub type Session {
   Session(
@@ -23,11 +23,17 @@ const users = [
   User(3, "alan", Guest, [], 7.25, Some(1)),
 ]
 
-pub fn get_user(_context: Context, id: Int) -> Promise(Result(User, ApiError)) {
+pub fn get_user(
+  _context: Context,
+  id id: Int,
+) -> Promise(Result(User, ApiError)) {
   promise.resolve(find(id))
 }
 
-pub fn list_users(_context: Context, role: Option(Role)) -> Promise(List(User)) {
+pub fn list_users(
+  _context: Context,
+  role role: Option(Role),
+) -> Promise(List(User)) {
   case role {
     None -> users
     Some(role) -> list.filter(users, fn(user) { user.role == role })
@@ -35,7 +41,10 @@ pub fn list_users(_context: Context, role: Option(Role)) -> Promise(List(User)) 
   |> promise.resolve
 }
 
-pub fn login(_context: Context, name: String) -> Promise(Result(Session, ApiError)) {
+pub fn login(
+  _context: Context,
+  name name: String,
+) -> Promise(Result(Session, ApiError)) {
   case list.find(users, fn(user) { user.name == name }) {
     Ok(user) -> Ok(session(user))
     Error(Nil) -> Error(shared.Unauthorized)
@@ -55,8 +64,8 @@ fn session(user: User) -> Session {
 /// Counts to `to`, reporting each step through a callback.
 pub fn count_slowly(
   _context: Context,
-  to: Int,
-  on_progress: fn(Int) -> Nil,
+  to to: Int,
+  on_progress on_progress: fn(Int) -> Nil,
 ) -> Promise(Int) {
   count_from(1, to, on_progress)
 }
@@ -74,12 +83,12 @@ fn count_from(n: Int, to: Int, on_progress: fn(Int) -> Nil) -> Promise(Int) {
 
 pub fn echo_everything(
   _context: Context,
-  everything: Everything,
+  everything everything: Everything,
 ) -> Promise(Everything) {
   promise.resolve(everything)
 }
 
-pub fn crash(_context: Context, reason: String) -> Promise(Int) {
+pub fn crash(_context: Context, reason reason: String) -> Promise(Int) {
   panic as reason
 }
 

@@ -7,7 +7,7 @@ import type { Todo$ } from "./build/dev/javascript/todos/todos/shared.mjs";
 type Todo = Pick<Todo$, "id" | "title" | "done">;
 type Change =
   | { $: "Snapshot"; todos: Todo[] }
-  | { $: "Upsert"; todo: Todo }
+  | { $: "Upsert"; item: Todo }
   | { $: "Removed"; id: number }
   | { $: "CompletedCleared" };
 type Reply<T> = { $: "Ok"; 0: T } | { $: "Error"; 0: unknown };
@@ -111,7 +111,7 @@ class RoomApi extends RpcTarget {
   add_todo(title: unknown) {
     return this.#room.run(async () => {
       const reply: Reply<Todo> = await this.#api.add_todo(title);
-      if (reply.$ === "Ok") this.#room.publish({ $: "Upsert", todo: reply[0] });
+      if (reply.$ === "Ok") this.#room.publish({ $: "Upsert", item: reply[0] });
       return reply;
     });
   }
@@ -119,7 +119,7 @@ class RoomApi extends RpcTarget {
   set_done(id: unknown, done: unknown) {
     return this.#room.run(async () => {
       const reply: Reply<Todo> = await this.#api.set_done(id, done);
-      if (reply.$ === "Ok") this.#room.publish({ $: "Upsert", todo: reply[0] });
+      if (reply.$ === "Ok") this.#room.publish({ $: "Upsert", item: reply[0] });
       return reply;
     });
   }

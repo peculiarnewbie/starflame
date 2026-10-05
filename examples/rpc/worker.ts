@@ -1,4 +1,4 @@
-// GENERATED (hand-written for the spike): the Worker entrypoint.
+// The Worker entrypoint, serving the generated Cap'n Web target.
 
 import { newWorkersRpcResponse } from "capnweb";
 import { newApi } from "./build/dev/javascript/spike/spike/generated/targets.ts";

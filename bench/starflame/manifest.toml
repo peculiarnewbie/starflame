@@ -23,6 +23,7 @@ packages = [
   { name = "starflame", version = "0.1.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "lustre"], source = "local", path = "../../packages/starflame" },
   { name = "starflame_db", version = "0.1.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "starflame"], source = "local", path = "../../packages/db/core" },
   { name = "starflame_db_kit", version = "0.1.0", build_tools = ["gleam"], requirements = ["argv", "gleam_crypto", "gleam_json", "gleam_stdlib", "simplifile", "starflame_db"], source = "local", path = "../../packages/db/kit" },
+  { name = "starflame_rpc_kit", version = "0.1.0", build_tools = ["gleam"], requirements = ["argv", "gleam_json", "gleam_stdlib", "simplifile"], source = "local", path = "../../packages/rpc/kit" },
 ]
 
 [requirements]
@@ -32,3 +33,4 @@ gleam_time = { version = ">= 1.0.0 and < 2.0.0" }
 starflame = { path = "../../packages/starflame" }
 starflame_db = { path = "../../packages/db/core" }
 starflame_db_kit = { path = "../../packages/db/kit" }
+starflame_rpc_kit = { path = "../../packages/rpc/kit" }

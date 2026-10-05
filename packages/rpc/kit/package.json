@@ -1,0 +1,9 @@
+{
+  "name": "@starflame/rpc-kit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "gleam build",
+    "test": "gleam test"
+  }
+}

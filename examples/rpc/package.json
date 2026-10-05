@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "exp": "gleam build && node experiments/run.mjs",
+    "exp": "gleam run -m starflame_rpc_kit -- check && gleam build && node experiments/run.mjs",
+    "rpc": "gleam run -m starflame_rpc_kit -- generate",
     "build": "gleam build"
   },
   "dependencies": {

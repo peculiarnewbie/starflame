@@ -1,13 +1,13 @@
 //// Every public function here is an RPC method.
 
-import starflame/d1
-import starflame/server.{type Context}
 import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}
 import gleam/string
+import starflame/d1
+import starflame/server.{type Context}
 import todos/shared.{
-  type Todo, type TodoError, EmptyTitle, NotFound, TitleTooLong, Todo,
-  max_title_length,
+  type Change, type Todo, type TodoError, EmptyTitle, NotFound, Snapshot,
+  TitleTooLong, Todo, max_title_length,
 }
 
 pub fn list_todos(context: Context) -> Promise(List(Todo)) {
@@ -21,7 +21,10 @@ pub fn list_todos(context: Context) -> Promise(List(Todo)) {
   todos
 }
 
-pub fn add_todo(context: Context, title: String) -> Promise(Result(Todo, TodoError)) {
+pub fn add_todo(
+  context: Context,
+  title title: String,
+) -> Promise(Result(Todo, TodoError)) {
   let title = string.trim(title)
   case string.length(title) {
     0 -> promise.resolve(Error(EmptyTitle))
@@ -42,8 +45,8 @@ pub fn add_todo(context: Context, title: String) -> Promise(Result(Todo, TodoErr
 
 pub fn set_done(
   context: Context,
-  id: Int,
-  done: Bool,
+  id id: Int,
+  done done: Bool,
 ) -> Promise(Result(Todo, TodoError)) {
   use db <- with_db(context)
   use todos <- or_reject(d1.all(
@@ -55,11 +58,16 @@ pub fn set_done(
   single(todos, id)
 }
 
-pub fn delete_todo(context: Context, id: Int) -> Promise(Result(Nil, TodoError)) {
+pub fn delete_todo(
+  context: Context,
+  id id: Int,
+) -> Promise(Result(Nil, TodoError)) {
   use db <- with_db(context)
-  use changes <- or_reject(d1.run(db, "DELETE FROM todos WHERE id = ?", [
-    d1.int(id),
-  ]))
+  use changes <- or_reject(
+    d1.run(db, "DELETE FROM todos WHERE id = ?", [
+      d1.int(id),
+    ]),
+  )
   case changes {
     0 -> Error(NotFound(id))
     _ -> Ok(Nil)
@@ -71,6 +79,17 @@ pub fn clear_completed(context: Context) -> Promise(Int) {
   use db <- with_db(context)
   use changes <- or_reject(d1.run(db, "DELETE FROM todos WHERE done = 1", []))
   changes
+}
+
+/// Sends `on_change` a snapshot of the list. The `TodoRoom` Durable Object
+/// in room.ts serves this method itself, so it can follow the snapshot with
+/// every later change.
+pub fn subscribe(
+  context: Context,
+  on_change on_change: fn(Change) -> Nil,
+) -> Promise(Nil) {
+  use todos <- promise.map(list_todos(context))
+  on_change(Snapshot(todos))
 }
 
 // DATABASE --------------------------------------------------------------------

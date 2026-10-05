@@ -42,13 +42,15 @@ errors, callbacks, capabilities, and reconnection.
 | Directory | Purpose |
 | --- | --- |
 | [packages/starflame](packages/starflame) | Gleam RPC runtime, wire codecs, and D1 bindings |
+| [packages/rpc/kit](packages/rpc/kit) | Generates RPC codecs, dispatchers and client functions from an API module |
+| [packages/db/core](packages/db/core) | D1 schemas in Gleam |
+| [packages/db/kit](packages/db/kit) | D1 migrations and typed CRUD modules from a schema |
 | [packages/vite](packages/vite) | `@starflame/vite` build plugin |
 | [examples/todo](examples/todo) | Todo POC |
 | [examples/rpc](examples/rpc) | RPC integration experiments |
 
-Early POC: codecs and RPC stubs are currently hand-written; automatic generation
-is next. Packages are local and unpublished. The todo demo has no authentication;
-production connection management still needs work.
+Early POC: packages are local and unpublished. The todo demo has no
+authentication; production connection management still needs work.
 
 ## Development
 
