@@ -9,7 +9,7 @@ The package targets JavaScript and exports:
 | `starflame/server` | Request context, argument decoding, and callback forwarding |
 | `starflame/plain` | Wire values and codecs for shared Gleam types |
 | `starflame/d1` | Cloudflare D1 bindings, setup, queries, and writes |
-| `starflame/fast_decode` | A fast path for decoding objects into records, for generated code |
+| `starflame/fast_decode` | A fast path for decoding wire values and D1 rows, for generated code |
 
 The examples use this package as a local Gleam dependency:
 
@@ -23,5 +23,5 @@ Consumers also need the `capnweb` JavaScript dependency (the examples pin
 Worker output. The package.json here is a private workspace build runner;
 `gleam.toml` defines the Gleam library.
 
-RPC codecs and dispatchers are currently hand-written in the examples.
-Automatic code generation is not implemented yet.
+[`starflame_rpc_kit`](../rpc/kit) generates the codecs, dispatchers and client
+functions that use this runtime.

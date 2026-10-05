@@ -15,3 +15,7 @@ export function object(entries) {
   for (const [key, value] of entries) result[key] = value;
   return result;
 }
+
+export function is_nil(value) {
+  return value === null || value === undefined;
+}

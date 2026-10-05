@@ -87,6 +87,15 @@ pub fn to_dynamic(value: Plain) -> Dynamic
 
 // DECODERS --------------------------------------------------------------------
 
+/// Decodes `null` or `undefined` as `Nil`.
+pub fn nil_decoder() -> Decoder(Nil) {
+  use value <- decode.then(decode.dynamic)
+  case is_nil(value) {
+    True -> decode.success(Nil)
+    False -> decode.failure(Nil, "Nil")
+  }
+}
+
 pub fn result_decoder(
   ok: Decoder(a),
   error: Decoder(e),
@@ -99,6 +108,9 @@ pub fn result_decoder(
     _ -> decode.failure(Error(dynamic.nil()), "Result") |> unsafe_coerce
   }
 }
+
+@external(javascript, "./plain_ffi.mjs", "is_nil")
+fn is_nil(value: Dynamic) -> Bool
 
 /// Only used to satisfy the type checker for the zero value of a failing
 /// decoder; the value is never observed.

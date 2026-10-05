@@ -55,6 +55,7 @@ pub fn main(env: Dynamic, execution: Dynamic) -> Promise(List(Check)) {
     #("query errors keep the SQLite code", query_errors),
     #("decode errors are reported", decode_errors),
     #("fast decoders agree with their fallbacks", fast_decoders),
+    #("fast kinds agree with gleam/dynamic/decode", fast_kinds),
     #("decode_rows decodes all rows; errors keep their paths", fast_rows),
     #("batch is atomic and returns each outcome", batch),
     #("setup runs once", fn(db, name) { setup(db, Nil, name) }),
@@ -575,6 +576,221 @@ fn fast_decoders(_db, name) {
     ]),
   )
 }
+
+type Tagged {
+  A
+  B(x: Int)
+}
+
+type Nest {
+  Nest(children: List(Nest))
+}
+
+fn nest_kind() -> fast_decode.Kind {
+  fast_decode.RecordKind([
+    Field(
+      "children",
+      fast_decode.ListKind(fast_decode.LazyKind(nest_kind)),
+      False,
+    ),
+  ])
+}
+
+fn nest_from(value: Dynamic) -> Nest {
+  Nest(fast_decode.list(fast_decode.get(value, "children"), nest_from))
+}
+
+fn nest_decoder() -> decode.Decoder(Nest) {
+  use children <- decode.field(
+    "children",
+    decode.list(decode.recursive(nest_decoder)),
+  )
+  decode.success(Nest(children))
+}
+
+/// Each kind against the `gleam/dynamic/decode` decoder it stands in for:
+/// both must give the same result for every input, and valid inputs must
+/// take the fast path.
+fn fast_kinds(_db, name) {
+  let int = fn(n) { plain.to_dynamic(plain.int(n)) }
+  let string = fn(s) { plain.to_dynamic(plain.string(s)) }
+  let null = plain.to_dynamic(plain.null())
+  let array = fn(items: List(Dynamic)) {
+    plain.to_dynamic(plain.list(items, unsafe_plain))
+  }
+  let object = fn(entries: List(#(String, Dynamic))) {
+    entries
+    |> list.map(fn(entry) { #(entry.0, unsafe_plain(entry.1)) })
+    |> plain.object
+    |> plain.to_dynamic
+  }
+  let tagged = fn(tag, entries) { object([#("$", string(tag)), ..entries]) }
+  promise.resolve(
+    list.flatten([
+      kind_case(
+        name <> ": list",
+        fast_decode.ListKind(fast_decode.IntKind),
+        fast_decode.list(_, fast_decode.coerce),
+        fn() { decode.list(decode.int) },
+        [array([int(1), int(2)]), array([])],
+        [
+          array([int(1), plain.to_dynamic(plain.float(1.5))]),
+          array([undefined()]),
+          string("x"),
+        ],
+      ),
+      kind_case(
+        name <> ": option",
+        fast_decode.OptionKind(fast_decode.StringKind),
+        fast_decode.option(_, fast_decode.coerce),
+        fn() { decode.optional(decode.string) },
+        [null, undefined(), string("a")],
+        [int(1)],
+      ),
+      kind_case(
+        name <> ": nil",
+        fast_decode.NilKind,
+        fn(_) { Nil },
+        plain.nil_decoder,
+        [null, undefined()],
+        [int(0), string("")],
+      ),
+      kind_case(
+        name <> ": dict",
+        fast_decode.DictKind(fast_decode.IntKind),
+        fast_decode.dict(_, fast_decode.coerce),
+        fn() { decode.dict(decode.string, decode.int) },
+        [object([]), object([#("a", int(1)), #("b", int(2))])],
+        [object([#("a", string("1"))]), array([int(1)]), instance(), null],
+      ),
+      kind_case(
+        name <> ": tuple",
+        fast_decode.TupleKind([fast_decode.IntKind, fast_decode.StringKind]),
+        fn(value) {
+          #(fast_decode.get(value, "0"), fast_decode.get(value, "1"))
+        },
+        fn() {
+          use a <- decode.field(0, decode.int)
+          use b <- decode.field(1, decode.string)
+          decode.success(#(a, b))
+        },
+        [array([int(1), string("a")])],
+        [
+          array([int(1)]),
+          array([string("a"), int(1)]),
+          // Longer arrays are left to the full decoder, which accepts them.
+          array([int(1), string("a"), int(2)]),
+          sparse(2),
+        ],
+      ),
+      kind_case(
+        name <> ": result",
+        fast_decode.ResultKind(fast_decode.IntKind, fast_decode.StringKind),
+        fast_decode.result(_, fast_decode.coerce, fast_decode.coerce),
+        fn() { plain.result_decoder(decode.int, decode.string) },
+        [tagged("Ok", [#("0", int(1))]), tagged("Error", [#("0", string("e"))])],
+        [
+          tagged("Ok", []),
+          tagged("Ok", [#("0", string("1"))]),
+          tagged("Maybe", [#("0", int(1))]),
+        ],
+      ),
+      kind_case(
+        name <> ": variants",
+        fast_decode.VariantsKind([
+          fast_decode.Variant("A", []),
+          fast_decode.Variant("B", [Field("x", fast_decode.IntKind, False)]),
+        ]),
+        fn(value) {
+          case fast_decode.tag(value) {
+            "A" -> A
+            _ -> B(fast_decode.get(value, "x"))
+          }
+        },
+        fn() {
+          use tag <- decode.field("$", decode.string)
+          case tag {
+            "A" -> decode.success(A)
+            "B" -> decode.field("x", decode.int, fn(x) { decode.success(B(x)) })
+            _ -> decode.failure(A, "Tagged")
+          }
+        },
+        [tagged("A", []), tagged("B", [#("x", int(1))])],
+        [tagged("B", []), tagged("C", []), object([]), int(1)],
+      ),
+      kind_case(
+        name <> ": record",
+        fast_decode.RecordKind([
+          Field("a", fast_decode.OptionKind(fast_decode.IntKind), False),
+        ]),
+        fn(value) {
+          fast_decode.option(fast_decode.get(value, "a"), fast_decode.coerce)
+        },
+        fn() { decode.field("a", decode.optional(decode.int), decode.success) },
+        [object([#("a", null)]), object([#("a", int(1))])],
+        // `decode.field` fails on a missing field, even an optional one.
+        [object([]), object([#("a", string("1"))])],
+      ),
+      kind_case(
+        name <> ": recursive",
+        nest_kind(),
+        nest_from,
+        nest_decoder,
+        [
+          object([#("children", array([]))]),
+          object([
+            #("children", array([object([#("children", array([]))])])),
+          ]),
+        ],
+        [object([#("children", array([object([])]))])],
+      ),
+    ]),
+  )
+}
+
+fn kind_case(
+  name: String,
+  kind: fast_decode.Kind,
+  build: fn(Dynamic) -> a,
+  full: fn() -> decode.Decoder(a),
+  valid: List(Dynamic),
+  invalid: List(Dynamic),
+) -> List(Check) {
+  let fast = fast_decode.kind_decoder(kind, build, full)
+  // Fails whatever the full decoder gets, so Ok proves the fast path ran.
+  let fast_only =
+    fast_decode.kind_decoder(kind, build, fn() {
+      decode.then(full(), decode.failure(_, "the fast path"))
+    })
+  list.flatten([
+    list.index_map(list.append(valid, invalid), fn(input, index) {
+      expect(
+        name <> " " <> string.inspect(index),
+        decode.run(input, fast),
+        decode.run(input, full()),
+      )
+    }),
+    list.index_map(valid, fn(input, index) {
+      expect(
+        name <> " " <> string.inspect(index) <> " takes the fast path",
+        decode.run(input, fast_only) |> result_is_ok,
+        True,
+      )
+    }),
+  ])
+}
+
+@external(javascript, "./d1_cases_ffi.mjs", "identity")
+fn unsafe_plain(value: Dynamic) -> plain.Plain
+
+@external(javascript, "./d1_cases_ffi.mjs", "undefined_")
+fn undefined() -> Dynamic
+
+@external(javascript, "./d1_cases_ffi.mjs", "sparse")
+fn sparse(length: Int) -> Dynamic
+
+@external(javascript, "./d1_cases_ffi.mjs", "instance")
+fn instance() -> Dynamic
 
 /// `decode_rows` decodes all rows in one run, and falls back to one run per
 /// row for errors without a row index.

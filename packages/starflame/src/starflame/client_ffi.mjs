@@ -25,3 +25,8 @@ export async function call(stub, method, args) {
     return Result$Error(String(error?.message ?? error));
   }
 }
+
+// Cap'n Web calls a callback with its arguments spread out.
+export function variadic(callback) {
+  return (...args) => callback(args);
+}

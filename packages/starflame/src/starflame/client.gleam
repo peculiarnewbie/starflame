@@ -1,11 +1,11 @@
 //// Client-side runtime used by generated RPC stubs.
 
-import starflame/plain.{type Plain}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type DecodeError, type Decoder}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 import lustre/effect.{type Effect}
+import starflame/plain.{type Plain}
 
 /// A Cap'n Web stub: the session's main API or a capability it returned.
 pub type Stub
@@ -48,12 +48,13 @@ pub fn stub_decoder() -> Decoder(Stub) {
   decode.dynamic |> decode.map(unsafe_stub)
 }
 
-/// Encode a Gleam callback so the server can call it. Arguments that don't
+/// Encode a Gleam callback so the server can call it. `arguments` decodes
+/// the array of arguments it's called with; calls whose arguments don't
 /// decode are dropped.
-pub fn callback1(callback: fn(a) -> Nil, decoder: Decoder(a)) -> Plain {
-  plain.unsafe_reference(fn(value: Dynamic) {
-    case decode.run(value, decoder) {
-      Ok(value) -> callback(value)
+pub fn callback(arguments: Decoder(a), callback: fn(a) -> Nil) -> Plain {
+  variadic(fn(values: Dynamic) {
+    case decode.run(values, arguments) {
+      Ok(values) -> callback(values)
       Error(_) -> Nil
     }
   })
@@ -75,3 +76,6 @@ fn do_call(
 
 @external(javascript, "./plain_ffi.mjs", "identity")
 fn unsafe_stub(value: Dynamic) -> Stub
+
+@external(javascript, "./client_ffi.mjs", "variadic")
+fn variadic(callback: fn(Dynamic) -> Nil) -> Plain

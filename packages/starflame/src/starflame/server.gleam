@@ -1,11 +1,11 @@
 //// Server-side runtime used by generated RPC dispatchers.
 
-import starflame/plain.{type Plain}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type DecodeError, type Decoder}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/string
+import starflame/plain.{type Plain}
 
 /// Passed as the first argument to every API function.
 pub opaque type Context {
@@ -33,14 +33,13 @@ pub fn arg(
 }
 
 /// Turn a Cap'n Web function stub received as an argument into a Gleam
-/// callback. Calls are fire-and-forget.
-pub fn callback1(
+/// callback taking the encoded arguments. Calls are fire-and-forget.
+pub fn callback(
   value: Dynamic,
-  encode: fn(a) -> Plain,
-  next: fn(fn(a) -> Nil) -> Promise(Plain),
+  next: fn(fn(List(Plain)) -> Nil) -> Promise(Plain),
 ) -> Promise(Plain) {
   case is_function(value) {
-    True -> next(fn(a) { call_stub(value, [encode(a)]) })
+    True -> next(fn(arguments) { call_stub(value, arguments) })
     False -> reject("Invalid RPC argument: expected a function")
   }
 }
