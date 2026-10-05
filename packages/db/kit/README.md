@@ -55,5 +55,10 @@ Migrations are written to `migrations/NNNN_name.sql` for
   `gleam format`. `codegen` rewrites the latest module; `check` reports missing
   or edited generated code. A Gleam upgrade that changes formatting makes
   `check` ask for `codegen` once.
+- **Generated decoders take a fast path.** `gleam/dynamic/decode` allocates
+  an `Ok(Some(value))` per field, which V8 is slow to construct, so a row
+  that matches its column types is checked in one pass and read directly.
+  Other rows get the full decoder and its errors. Decoding 50 rows takes
+  about 11µs instead of 230µs.
 
 Requires Node 22.13 or later for `node:sqlite`, and `gleam` on the `PATH`.

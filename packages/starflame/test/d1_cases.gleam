@@ -12,6 +12,8 @@ import starflame/d1.{
   Check, ConstraintError, DecodeError, ForeignKey, InvalidValue, NotNull,
   Outcome, PrimaryKey, QueryError, Trigger, Unique,
 }
+import starflame/fast_decode.{Field}
+import starflame/plain
 import starflame/server
 
 const max_safe = 9_007_199_254_740_991
@@ -52,6 +54,8 @@ pub fn main(env: Dynamic, execution: Dynamic) -> Promise(List(Check)) {
     #("constraint errors are classified", constraint_errors),
     #("query errors keep the SQLite code", query_errors),
     #("decode errors are reported", decode_errors),
+    #("fast decoders agree with their fallbacks", fast_decoders),
+    #("decode_rows decodes all rows; errors keep their paths", fast_rows),
     #("batch is atomic and returns each outcome", batch),
     #("setup runs once", fn(db, name) { setup(db, Nil, name) }),
     #("setup reports failures and retries", fn(_, name) {
@@ -456,6 +460,162 @@ fn setup_failure(other, _ignored, name) {
 }
 
 // HELPERS ---------------------------------------------------------------------
+
+type Sample {
+  Sample(
+    int: Int,
+    safe: Int,
+    float: Float,
+    string: String,
+    bool: Bool,
+    zero_one: Bool,
+    maybe: option.Option(Int),
+  )
+}
+
+const sample_fields = [
+  Field("int", fast_decode.IntKind, False),
+  Field("safe", fast_decode.SafeIntKind, False),
+  Field("float", fast_decode.FloatKind, False),
+  Field("string", fast_decode.StringKind, False),
+  Field("bool", fast_decode.BoolKind, False),
+  Field("zero_one", fast_decode.ZeroOrOneKind, False),
+  Field("maybe", fast_decode.SafeIntKind, True),
+]
+
+fn sample_from(value: Dynamic) -> Sample {
+  Sample(
+    int: fast_decode.get(value, "int"),
+    safe: fast_decode.get(value, "safe"),
+    float: fast_decode.get(value, "float"),
+    string: fast_decode.get(value, "string"),
+    bool: fast_decode.get(value, "bool"),
+    zero_one: fast_decode.zero_or_one(value, "zero_one"),
+    maybe: fast_decode.nullable(value, "maybe", fast_decode.get),
+  )
+}
+
+fn sample_fallback() -> decode.Decoder(Sample) {
+  use int <- decode.field("int", decode.int)
+  use safe <- decode.field("safe", d1.int_decoder())
+  use float <- decode.field("float", decode.float)
+  use string <- decode.field("string", decode.string)
+  use bool <- decode.field("bool", decode.bool)
+  use zero_one <- decode.field("zero_one", d1.bool_decoder())
+  use maybe <- decode.field("maybe", decode.optional(d1.int_decoder()))
+  decode.success(Sample(int:, safe:, float:, string:, bool:, zero_one:, maybe:))
+}
+
+/// A valid sample object with one field replaced, or removed if `value` is
+/// None.
+fn sample(field: String, value: option.Option(plain.Plain)) -> Dynamic {
+  [
+    #("int", plain.int(-3)),
+    #("safe", plain.int(max_safe)),
+    #("float", plain.float(1.5)),
+    #("string", plain.string("text")),
+    #("bool", plain.bool(True)),
+    #("zero_one", plain.int(1)),
+    #("maybe", plain.int(7)),
+  ]
+  |> list.filter_map(fn(entry) {
+    case entry.0 == field, value {
+      False, _ -> Ok(entry)
+      True, Some(value) -> Ok(#(field, value))
+      True, None -> Error(Nil)
+    }
+  })
+  |> plain.object
+  |> plain.to_dynamic
+}
+
+fn fast_decoders(_db, name) {
+  let fast = fast_decode.decoder(sample_fields, sample_from, sample_fallback())
+  // Fails everything, so a decoded value proves the fast path ran.
+  let fast_only =
+    fast_decode.decoder(
+      sample_fields,
+      sample_from,
+      decode.failure(sample_from(sample("", None)), "fast path"),
+    )
+  let valid = [
+    #("valid", sample("", None)),
+    #("null nullable", sample("maybe", Some(plain.null()))),
+    #("whole float", sample("float", Some(plain.int(3)))),
+    #("zero", sample("zero_one", Some(plain.int(0)))),
+  ]
+  let invalid = [
+    #("fractional int", sample("int", Some(plain.float(1.5)))),
+    #("unsafe int", sample("safe", Some(plain.float(9_007_199_254_740_992.0)))),
+    #("string for float", sample("float", Some(plain.string("1.5")))),
+    #("1 for bool", sample("bool", Some(plain.int(1)))),
+    #("true for 0/1", sample("zero_one", Some(plain.bool(True)))),
+    #("2 for 0/1", sample("zero_one", Some(plain.int(2)))),
+    #("null for non-null", sample("string", Some(plain.null()))),
+    #("wrong nullable", sample("maybe", Some(plain.string("7")))),
+    #("missing field", sample("string", None)),
+    #("not an object", plain.to_dynamic(plain.string("text"))),
+  ]
+  promise.resolve(
+    list.flatten([
+      list.map(list.append(valid, invalid), fn(input) {
+        expect(
+          name <> ": " <> input.0,
+          decode.run(input.1, fast),
+          decode.run(input.1, sample_fallback()),
+        )
+      }),
+      list.map(valid, fn(input) {
+        expect(
+          name <> ": " <> input.0 <> " takes the fast path",
+          decode.run(input.1, fast_only) |> result_is_ok,
+          True,
+        )
+      }),
+    ]),
+  )
+}
+
+/// `decode_rows` decodes all rows in one run, and falls back to one run per
+/// row for errors without a row index.
+fn fast_rows(db, name) {
+  use inserted <- promise.await(
+    d1.run(
+      db,
+      "INSERT INTO users (id, email, admin) VALUES (1, 'a@b', 0), (2, 'c@d', 1)",
+      [],
+    ),
+  )
+  use rows <- promise.await(
+    d1.all(db, "SELECT id, email, admin FROM users ORDER BY id", [], {
+      use id <- decode.field("id", d1.int_decoder())
+      use admin <- decode.field("admin", d1.bool_decoder())
+      decode.success(#(id, admin))
+    }),
+  )
+  use bad <- promise.map(d1.all(
+    db,
+    "SELECT id, email AS admin FROM users ORDER BY id",
+    [],
+    decode.field("admin", d1.bool_decoder(), decode.success),
+  ))
+  [
+    expect(name <> ": inserted", inserted, Ok(2)),
+    expect(name <> ": rows", rows, Ok([#(1, False), #(2, True)])),
+    expect(
+      name <> ": error without a row index",
+      bad,
+      Error(DecodeError([decode.DecodeError("Int", "String", ["admin"])])),
+    ),
+  ]
+}
+
+fn result_is_ok(result: Result(a, b)) -> Bool {
+  case result {
+    Ok(_) -> True
+    Error(_) -> False
+  }
+}
 
 fn scalar(db, sql, decoder) {
   d1.raw(db, sql, [], decode.field(0, decoder, decode.success))

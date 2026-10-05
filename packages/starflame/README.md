@@ -9,6 +9,7 @@ The package targets JavaScript and exports:
 | `starflame/server` | Request context, argument decoding, and callback forwarding |
 | `starflame/plain` | Wire values and codecs for shared Gleam types |
 | `starflame/d1` | Cloudflare D1 bindings, setup, queries, and writes |
+| `starflame/fast_decode` | A fast path for decoding objects into records, for generated code |
 
 The examples use this package as a local Gleam dependency:
 

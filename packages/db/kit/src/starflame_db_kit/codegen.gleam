@@ -21,11 +21,13 @@ fn source(snapshot: Snapshot) -> String {
     case tables {
       [] -> []
       _ -> [
+        "import gleam/dynamic",
         "import gleam/dynamic/decode",
         "import gleam/javascript/promise",
         "import gleam/list",
         "import gleam/option",
         "import starflame/d1",
+        "import starflame/fast_decode",
       ]
     }
     |> list.append(case list.any(tables, has_insertable) {
@@ -109,9 +111,29 @@ fn columns_constant(table: Table) -> String {
   )
 }
 
+/// The private helpers are named so no other row type's generated names can
+/// match them: `<row>_<anything>_decoder` would collide with the decoder of a
+/// row named `<Row><Anything>`.
 fn decoder(table: Table) -> String {
   let name = snake_case(table.row)
   let fields =
+    list.map(table.columns, fn(column) {
+      "fast_decode.Field("
+      <> gleam_string(column.name)
+      <> ", fast_decode."
+      <> fast_kind(column.kind)
+      <> ", "
+      <> case column.nullable {
+        True -> "True"
+        False -> "False"
+      }
+      <> ")"
+    })
+  let reads =
+    list.map(table.columns, fn(column) {
+      field_name(column.name) <> ": " <> fast_read(column)
+    })
+  let checked =
     list.map(table.columns, fn(column) {
       "  use "
       <> field_name(column.name)
@@ -121,12 +143,40 @@ fn decoder(table: Table) -> String {
       <> column_decoder(column)
       <> ")\n"
     })
-  "pub fn "
+  "/// Rows that match go through a fast path; others get the full decoder's\n"
+  <> "/// errors.\n"
+  <> "pub fn "
   <> name
   <> "_decoder() -> decode.Decoder("
   <> table.row
   <> ") {\n"
-  <> string.concat(fields)
+  <> "  fast_decode.decoder("
+  <> name
+  <> "_fields, "
+  <> name
+  <> "_from_row, "
+  <> name
+  <> "_fallback())\n}\n\n"
+  <> "const "
+  <> name
+  <> "_fields = ["
+  <> string.join(fields, ", ")
+  <> "]\n\n"
+  <> "fn "
+  <> name
+  <> "_from_row(row: dynamic.Dynamic) -> "
+  <> table.row
+  <> " {\n  "
+  <> table.row
+  <> "("
+  <> string.join(reads, ", ")
+  <> ")\n}\n\n"
+  <> "fn "
+  <> name
+  <> "_fallback() -> decode.Decoder("
+  <> table.row
+  <> ") {\n"
+  <> string.concat(checked)
   <> "  decode.success("
   <> table.row
   <> "("
@@ -135,6 +185,34 @@ fn decoder(table: Table) -> String {
     ", ",
   )
   <> "))\n}"
+}
+
+/// The fast path's check for a column, matching `column_decoder`.
+fn fast_kind(kind: Kind) -> String {
+  case kind {
+    schema.IntKind | schema.TimestampKind -> "SafeIntKind"
+    schema.FloatKind -> "FloatKind"
+    schema.TextKind -> "StringKind"
+    schema.BoolKind -> "ZeroOrOneKind"
+  }
+}
+
+/// Reads a checked column, matching `column_decoder`.
+fn fast_read(column: Column) -> String {
+  let name = gleam_string(column.name)
+  case column.nullable, column.kind {
+    False, schema.BoolKind -> "fast_decode.zero_or_one(row, " <> name <> ")"
+    False, schema.TimestampKind ->
+      "timestamp.from_unix_seconds(fast_decode.get(row, " <> name <> "))"
+    False, _ -> "fast_decode.get(row, " <> name <> ")"
+    True, schema.BoolKind ->
+      "fast_decode.nullable(row, " <> name <> ", fast_decode.zero_or_one)"
+    True, schema.TimestampKind ->
+      "fast_decode.nullable(row, "
+      <> name
+      <> ", fn(row, name) { timestamp.from_unix_seconds(fast_decode.get(row, name)) })"
+    True, _ -> "fast_decode.nullable(row, " <> name <> ", fast_decode.get)"
+  }
 }
 
 fn insert_function(table: Table) -> String {

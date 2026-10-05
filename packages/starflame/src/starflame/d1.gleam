@@ -219,8 +219,15 @@ pub fn decode_rows(
   rows: List(Dynamic),
   decoder: Decoder(a),
 ) -> Result(List(a), Error) {
-  list.try_map(rows, decode.run(_, decoder))
-  |> result.map_error(DecodeError)
+  // One `decode.run` for all rows: each run allocates a Result, which V8 is
+  // slow to construct. On failure, decode row by row so error paths don't
+  // gain a row index.
+  case decode.run(dynamic.list(rows), decode.list(decoder)) {
+    Ok(values) -> Ok(values)
+    Error(_) ->
+      list.try_map(rows, decode.run(_, decoder))
+      |> result.map_error(DecodeError)
+  }
 }
 
 /// Run statements once per isolate, before the first query that asks for it.
