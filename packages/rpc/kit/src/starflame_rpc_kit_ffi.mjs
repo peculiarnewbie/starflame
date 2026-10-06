@@ -127,10 +127,16 @@ function copy(from, to) {
   cpSync(from, to, { preserveTimestamps: true });
 }
 
-/// The copy lives elsewhere, so path dependencies need absolute paths.
-function absolutePaths(toml, root) {
-  return toml.replace(/path = "([^"]+)"/g, (match, path) =>
-    isAbsolute(path) ? match : `path = "${resolve(root, path)}"`,
+/// The copy lives elsewhere, so local path dependencies need absolute paths.
+/// They're inline tables, in gleam.toml and manifest.toml alike. A git
+/// dependency's `path` is a directory in its repository, and stays relative.
+export function absolutePaths(toml, root) {
+  return toml.replace(/\{[^{}]*\}/g, (table) =>
+    /\bgit\s*=|source\s*=\s*"git"/.test(table)
+      ? table
+      : table.replace(/\bpath\s*=\s*"([^"]+)"/g, (match, path) =>
+          isAbsolute(path) ? match : `path = "${resolve(root, path)}"`,
+        ),
   );
 }
 

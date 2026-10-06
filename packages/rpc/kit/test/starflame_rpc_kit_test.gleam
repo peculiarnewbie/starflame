@@ -615,3 +615,42 @@ fn shell(
 
 @external(javascript, "./starflame_rpc_kit_test_ffi.mjs", "absolute")
 fn absolute(path: String) -> String
+
+pub fn only_local_dependency_paths_become_absolute_test() {
+  let toml =
+    "[dependencies]
+local = { path = \"../local\" }
+remote = { git = \"https://example.com/repo\", ref = \"abc\", path = \"packages/remote\" }
+
+[repository]
+path = \"packages/app\"
+"
+  let manifest =
+    "packages = [
+  { name = \"local\", source = \"local\", path = \"../local\" },
+  { name = \"remote\", source = \"git\", repo = \"https://example.com/repo\", commit = \"abc\", path = \"packages/remote\" },
+]
+"
+  let assert True =
+    string.contains(
+      absolute_paths(toml, "/app"),
+      "local = { path = \"/local\" }",
+    )
+  let assert True =
+    string.contains(
+      absolute_paths(toml, "/app"),
+      "path = \"packages/remote\" }",
+    )
+  let assert True =
+    string.contains(absolute_paths(toml, "/app"), "path = \"packages/app\"\n")
+  let assert True =
+    string.contains(absolute_paths(manifest, "/app"), "path = \"/local\" }")
+  let assert True =
+    string.contains(
+      absolute_paths(manifest, "/app"),
+      "commit = \"abc\", path = \"packages/remote\" }",
+    )
+}
+
+@external(javascript, "./starflame_rpc_kit_ffi.mjs", "absolutePaths")
+fn absolute_paths(toml: String, root: String) -> String
