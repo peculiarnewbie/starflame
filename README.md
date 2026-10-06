@@ -45,12 +45,39 @@ errors, callbacks, capabilities, and reconnection.
 | [packages/rpc/kit](packages/rpc/kit) | Generates RPC codecs, dispatchers and client functions from an API module |
 | [packages/db/core](packages/db/core) | D1 schemas in Gleam |
 | [packages/db/kit](packages/db/kit) | D1 migrations and typed CRUD modules from a schema |
+| [packages/openauth](packages/openauth) | Sign-in with an OpenAuth issuer in the app's Worker |
 | [packages/vite](packages/vite) | `@starflame/vite` build plugin |
+| [examples/notes](examples/notes) | Per-user notes: sign-in, HTTP RPC and D1, as a template for apps with users |
 | [examples/todo](examples/todo) | Todo POC |
 | [examples/rpc](examples/rpc) | RPC integration experiments |
 
-Early POC: packages are local and unpublished. The todo demo has no
-authentication; production connection management still needs work.
+Early POC: packages are unpublished. The todo demo has no authentication;
+the notes example shows how to add it. Production connection management for
+live WebSocket apps still needs work.
+
+## Using Starflame in another app
+
+Depend on the packages from this repository, pinned to a commit. Gleam
+1.18's `path` field selects each package's directory, and all of them need
+the same `ref`:
+
+```toml
+[dependencies]
+starflame = { git = "https://github.com/peculiarnewbie/starflame", ref = "<commit>", path = "packages/starflame" }
+starflame_db = { git = "https://github.com/peculiarnewbie/starflame", ref = "<commit>", path = "packages/db/core" }
+starflame_openauth = { git = "https://github.com/peculiarnewbie/starflame", ref = "<commit>", path = "packages/openauth" }
+
+[dev-dependencies]
+starflame_rpc_kit = { git = "https://github.com/peculiarnewbie/starflame", ref = "<commit>", path = "packages/rpc/kit" }
+starflame_db_kit = { git = "https://github.com/peculiarnewbie/starflame", ref = "<commit>", path = "packages/db/kit" }
+```
+
+```json
+"@starflame/vite": "github:peculiarnewbie/starflame#<commit>&path:/packages/vite"
+```
+
+Start from [examples/notes](examples/notes), replacing its `path`
+dependencies with these.
 
 ## Development
 

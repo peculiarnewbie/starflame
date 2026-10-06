@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm --filter @starflame/runtime --filter @starflame/db-kit --filter @starflame/rpc-kit --filter @starflame/example-blog test && pnpm --filter @starflame/example-rpc exp",
+    "test": "pnpm --filter @starflame/runtime --filter @starflame/db-kit --filter @starflame/rpc-kit --filter @starflame/openauth --filter @starflame/example-blog --filter @starflame/example-notes test && pnpm --filter @starflame/example-rpc exp",
     "dev": "pnpm --filter @starflame/example-todo dev",
     "smoke": "pnpm --filter @starflame/example-todo smoke",
     "test:compare": "pnpm --filter @starflame/example-todo test:compare",

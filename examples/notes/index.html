@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>notes · starflame</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f5f2;
+        --card: #ffffff;
+        --text: #1d1b16;
+        --muted: #77736a;
+        --line: #e7e4dd;
+        --accent: #c2389f;
+        --danger: #c0392b;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15141a;
+          --card: #1f1d26;
+          --text: #ece9f2;
+          --muted: #8f8a9c;
+          --line: #2f2c38;
+          --accent: #ffaff3;
+          --danger: #ff7b6b;
+        }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); }
+      .app { max-width: 34rem; margin: 3rem auto; padding: 0 1rem; }
+      header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+      header form { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.85rem; }
+      h1 { margin: 0 0 1.5rem; font-size: 2.5rem; letter-spacing: -0.04em; }
+      .muted { color: var(--muted); }
+      .sign-in { display: flex; flex-direction: column; gap: 0.5rem; max-width: 16rem; }
+      .sign-in a { padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--card); color: inherit; text-decoration: none; text-align: center; }
+      .sign-in a:hover { border-color: var(--accent); }
+      .error { padding: 0.6rem 0.9rem; border-radius: 0.6rem; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font-size: 0.9rem; }
+      textarea { width: 100%; min-height: 5rem; padding: 0.8rem 1rem; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 0.75rem; resize: vertical; }
+      textarea:focus { outline: none; border-color: var(--accent); }
+      form > button { margin-top: 0.5rem; padding: 0.5rem 1.2rem; font: inherit; border: none; border-radius: 0.5rem; background: var(--accent); color: var(--bg); cursor: pointer; }
+      .notes { list-style: none; margin: 1.5rem 0 0; padding: 0; }
+      .notes li { display: flex; justify-content: space-between; align-items: start; gap: 1rem; padding: 0.8rem 1rem; margin-bottom: 0.5rem; background: var(--card); border: 1px solid var(--line); border-radius: 0.75rem; }
+      .notes p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .link { border: none; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 0; }
+      .link:hover { color: var(--danger); }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

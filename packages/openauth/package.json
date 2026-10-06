@@ -1,0 +1,15 @@
+{
+  "name": "@starflame/openauth",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "gleam build",
+    "test": "gleam build && node test/run.mjs"
+  },
+  "devDependencies": {
+    "@openauthjs/openauth": "0.4.3",
+    "esbuild": "^0.28.2",
+    "hono": "^4.13.12",
+    "miniflare": "5.20261001.0-alpha"
+  }
+}

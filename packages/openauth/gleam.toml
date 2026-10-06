@@ -1,0 +1,12 @@
+name = "starflame_openauth"
+version = "0.1.0"
+target = "javascript"
+description = "Sign-in for Starflame apps with an OpenAuth issuer in the same Worker"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_javascript = ">= 1.0.0 and < 2.0.0"
+starflame = { path = "../starflame" }
+
+[dev_dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

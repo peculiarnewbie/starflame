@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "dialect": "d1",
+  "id": "0001_init",
+  "parent": "",
+  "checksum": "d9cdd522d1f9f63949794e3a526fc56d70f830a13af1a17d60abb05019a76e5e",
+  "custom": false,
+  "tables": [
+    {
+      "name": "notes",
+      "row": "Note",
+      "columns": [
+        {
+          "name": "id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "user_id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": {
+            "table": "users",
+            "column": "id",
+            "on_delete": "CASCADE"
+          }
+        },
+        {
+          "name": "body",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "created_at",
+          "kind": "timestamp",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "expression": "unixepoch()"
+          },
+          "references": null
+        }
+      ],
+      "indexes": [
+        {
+          "name": "notes_user_idx",
+          "columns": ["user_id"],
+          "unique": false
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "users",
+      "row": "User",
+      "columns": [
+        {
+          "name": "id",
+          "kind": "int",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "email",
+          "kind": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "google_subject",
+          "kind": "text",
+          "nullable": true,
+          "primary_key": false,
+          "unique": true,
+          "default": null,
+          "references": null
+        },
+        {
+          "name": "created_at",
+          "kind": "timestamp",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": {
+            "expression": "unixepoch()"
+          },
+          "references": null
+        }
+      ],
+      "indexes": [],
+      "checks": []
+    }
+  ]
+}
