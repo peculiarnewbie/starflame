@@ -22,6 +22,12 @@ pub fn connect(url: String) -> Api {
   Api(client.connect(url))
 }
 
+/// Calls the API over HTTP at `url`, one request per call. Callbacks and
+/// capabilities need `connect` instead.
+pub fn connect_http(url: String) -> Api {
+  Api(client.connect_http(url))
+}
+
 /// Calls the API through `stub`, such as a target in the same Worker.
 pub fn from_stub(stub: client.Stub) -> Api {
   Api(stub)
@@ -116,6 +122,23 @@ pub fn login(
     "login",
     [plain.string(name)],
     plain.result_decoder(session_decoder(), wire.api_error_decoder()),
+  )
+}
+
+/// Who's calling, from the `auth` the Worker passed to `newApi`: it passes
+/// `{ name }` for `/rpc?as=<name>`.
+pub fn whoami(
+  api: Api,
+) -> promise.Promise(Result(Result(String, shared.ApiError), client.RpcError)) {
+  client.call(
+    api.stub,
+    "whoami",
+    [],
+    fast_decode.kind_decoder(
+      fast_decode.ResultKind(fast_decode.StringKind, wire.api_error_kind),
+      fast_decode.result(_, fast_decode.coerce, wire.api_error_from_plain),
+      fn() { plain.result_decoder(decode.string, wire.api_error_decoder()) },
+    ),
   )
 }
 

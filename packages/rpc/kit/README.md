@@ -63,12 +63,14 @@ such as `then` and `map`.
 | --- | --- |
 | `wire.gleam` | An encoder and decoder for every data type that crosses the wire, shared by client and server |
 | `server.gleam` | A dispatcher per method: decodes the arguments, calls the API, encodes the reply |
-| `targets.ts` | `RpcTarget` classes forwarding to the dispatchers, and `newApi(env, execution)` for the Worker |
-| `client.gleam` | `connect`, `from_stub`, `on_broken`, `dispose` and a typed function per method |
+| `targets.ts` | `RpcTarget` classes forwarding to the dispatchers, and `newApi(env, execution, auth?)` for the Worker |
+| `client.gleam` | `connect`, `connect_http`, `from_stub`, `on_broken`, `dispose` and a typed function per method |
 
 `client.gleam` imports only `wire.gleam` and the data types, so a browser
 bundle doesn't pull in server code. The Worker serves `newApi` with Cap'n
 Web, and anything app-specific, like the todo example's live room, wraps it.
+`auth` is what `server.auth` returns to the API, such as the user the Worker
+signed in.
 
 Decoders check a value against its shape in one pass, then build it
 directly; only values that don't match go through `gleam/dynamic/decode`,

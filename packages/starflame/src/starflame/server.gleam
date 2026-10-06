@@ -9,15 +9,35 @@ import starflame/plain.{type Plain}
 
 /// Passed as the first argument to every API function.
 pub opaque type Context {
-  Context(env: Dynamic, execution: Dynamic)
+  Context(env: Dynamic, execution: Dynamic, auth: Dynamic)
 }
 
 pub fn new_context(env: Dynamic, execution: Dynamic) -> Context {
-  Context(env:, execution:)
+  Context(env:, execution:, auth: dynamic.nil())
+}
+
+/// The context with `auth`, such as the user the Worker verified for this
+/// request.
+pub fn with_auth(context: Context, auth: Dynamic) -> Context {
+  Context(..context, auth:)
 }
 
 pub fn env(context: Context) -> Dynamic {
   context.env
+}
+
+/// What the Worker passed as `auth` to `newApi`, or `Nil` when it passed
+/// nothing. Decode it into the app's own type:
+///
+/// ```gleam
+/// fn require_user(context: Context) -> Result(User, AuthError) {
+///   server.auth(context)
+///   |> decode.run(user_decoder())
+///   |> result.replace_error(SignedOut)
+/// }
+/// ```
+pub fn auth(context: Context) -> Dynamic {
+  context.auth
 }
 
 /// Decode an RPC argument, rejecting the call if it doesn't match.

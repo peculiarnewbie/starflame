@@ -21,6 +21,12 @@ pub fn connect(url: String) -> Api {
   Api(client.connect(url))
 }
 
+/// Calls the API over HTTP at `url`, one request per call. Callbacks and
+/// capabilities need `connect` instead.
+pub fn connect_http(url: String) -> Api {
+  Api(client.connect_http(url))
+}
+
 /// Calls the API through `stub`, such as a target in the same Worker.
 pub fn from_stub(stub: client.Stub) -> Api {
   Api(stub)

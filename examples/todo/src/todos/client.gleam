@@ -11,7 +11,7 @@ import lustre/element.{type Element, text}
 import lustre/element/html
 import lustre/element/keyed
 import lustre/event
-import starflame/client.{type RpcError, Decode, Remote}
+import starflame/client.{type RpcError, Decode, Http, Remote}
 import todos/generated/client as api
 import todos/shared.{
   type Change, type Todo, type TodoError, CompletedCleared, EmptyTitle, NotFound,
@@ -298,6 +298,8 @@ fn describe_todo_error(error: TodoError) -> String {
 fn describe_rpc_error(error: RpcError) -> String {
   case error {
     Remote(message) -> message
+    Http(status) ->
+      "The request failed with HTTP " <> int.to_string(status) <> "."
     Decode(_) -> "The server sent something unexpected."
   }
 }

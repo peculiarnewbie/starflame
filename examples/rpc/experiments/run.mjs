@@ -45,6 +45,9 @@ console.log("\n# Gleam client stubs (WebSocket)");
 const experiments = await import(gleam("spike/experiments.mjs"));
 failures += await experiments.main(wsUrl);
 
+console.log("\n# Gleam client stubs (HTTP)");
+failures += await experiments.http_main(`http://${base.host}`);
+
 console.log("\n# Raw Cap'n Web");
 {
   using api = newWebSocketRpcSession(wsUrl);

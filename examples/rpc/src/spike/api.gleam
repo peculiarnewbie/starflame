@@ -1,6 +1,7 @@
 //// Every public function here is an RPC method. Types with function fields
 //// (like `Session`) are capabilities: they're passed by reference.
 
+import gleam/dynamic/decode
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -97,4 +98,15 @@ fn find(id: Int) -> Result(User, ApiError) {
     Ok(user) -> Ok(user)
     Error(Nil) -> Error(NotFound(id))
   }
+}
+
+/// Who's calling, from the `auth` the Worker passed to `newApi`: it passes
+/// `{ name }` for `/rpc?as=<name>`.
+pub fn whoami(context: Context) -> Promise(Result(String, ApiError)) {
+  promise.resolve(
+    case decode.run(server.auth(context), decode.at(["name"], decode.string)) {
+      Ok(name) -> Ok(name)
+      Error(_) -> Error(shared.Unauthorized)
+    },
+  )
 }

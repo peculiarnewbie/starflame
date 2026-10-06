@@ -11,12 +11,16 @@ The package targets JavaScript and exports:
 | `starflame/d1` | Cloudflare D1 bindings, setup, queries, and writes |
 | `starflame/fast_decode` | A fast path for decoding wire values and D1 rows, for generated code |
 
-The examples use this package as a local Gleam dependency:
+The examples use this package as a local Gleam dependency; other apps can
+depend on it from git, as the root README shows.
 
-```toml
-[dependencies]
-starflame = { path = "../../packages/starflame" }
-```
+The client calls the API over a WebSocket with `connect`, or over HTTP with
+`connect_http`, one request per call. HTTP suits APIs without callbacks or
+capabilities: nothing stays open, and each call carries the page's cookies.
+A request the Worker refuses fails with `Http(status)`, such as `Http(401)`.
+
+On the server, `server.auth(context)` returns what the Worker passed as
+`auth` to `newApi`, such as the signed-in user, for the API to decode.
 
 Consumers also need the `capnweb` JavaScript dependency (the examples pin
 `0.12.0`). Use the companion `@starflame/vite` package to build browser and

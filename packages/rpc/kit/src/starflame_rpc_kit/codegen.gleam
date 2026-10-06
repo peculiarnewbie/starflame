@@ -904,6 +904,12 @@ pub fn connect(url: String) -> Api {
   Api(client.connect(url))
 }
 
+/// Calls the API over HTTP at `url`, one request per call. Callbacks and
+/// capabilities need `connect` instead.
+pub fn connect_http(url: String) -> Api {
+  Api(client.connect_http(url))
+}
+
 /// Calls the API through `stub`, such as a target in the same Worker.
 pub fn from_stub(stub: client.Stub) -> Api {
   Api(stub)
@@ -1141,9 +1147,14 @@ fn targets_module(scope: Scope) -> String {
   <> string.concat(methods)
   <> "}\n\n"
   <> string.concat(list.map(capabilities, fn(class) { class <> "\n" }))
-  <> "/** The API's target for a request, with the Worker's `env` and execution context. */\n"
-  <> "export function newApi(env: unknown, execution: unknown) {\n"
-  <> "  return new Api(runtime.new_context(env, execution));\n"
+  <> "/**\n"
+  <> " * The API's target for a request, with the Worker's `env` and execution\n"
+  <> " * context. `auth`, such as the user the Worker verified, is what\n"
+  <> " * `server.auth` returns.\n"
+  <> " */\n"
+  <> "export function newApi(env: unknown, execution: unknown, auth: unknown = null) {\n"
+  <> "  const context = runtime.new_context(env, execution);\n"
+  <> "  return new Api(runtime.with_auth(context, auth));\n"
   <> "}\n"
 }
 

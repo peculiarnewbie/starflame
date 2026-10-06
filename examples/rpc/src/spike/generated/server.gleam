@@ -78,6 +78,11 @@ pub fn login(
   |> promise.map(plain.result(_, session_to_plain, wire.api_error_to_plain))
 }
 
+pub fn whoami(context: server.Context) -> promise.Promise(plain.Plain) {
+  api.whoami(context)
+  |> promise.map(plain.result(_, plain.string, wire.api_error_to_plain))
+}
+
 // Session ---------------------------------------------------------------------
 
 @external(javascript, "./targets.ts", "newSessionTarget")

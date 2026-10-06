@@ -39,6 +39,10 @@ export class Api extends RpcTarget {
   login(name: unknown) {
     return server.login(this.#context, name);
   }
+
+  whoami() {
+    return server.whoami(this.#context);
+  }
 }
 
 class SessionTarget extends RpcTarget {
@@ -62,7 +66,12 @@ export function newSessionTarget(session: unknown) {
   return new SessionTarget(session);
 }
 
-/** The API's target for a request, with the Worker's `env` and execution context. */
-export function newApi(env: unknown, execution: unknown) {
-  return new Api(runtime.new_context(env, execution));
+/**
+ * The API's target for a request, with the Worker's `env` and execution
+ * context. `auth`, such as the user the Worker verified, is what
+ * `server.auth` returns.
+ */
+export function newApi(env: unknown, execution: unknown, auth: unknown = null) {
+  const context = runtime.new_context(env, execution);
+  return new Api(runtime.with_auth(context, auth));
 }

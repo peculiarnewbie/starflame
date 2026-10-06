@@ -14,6 +14,9 @@ pub type RpcError {
   /// The call was rejected: the session broke, the server threw, or it
   /// rejected the arguments.
   Remote(message: String)
+  /// An HTTP session's request failed with this status before reaching the
+  /// API, such as 401 when the Worker rejects it.
+  Http(status: Int)
   /// The server's reply didn't match the expected type.
   Decode(errors: List(DecodeError))
 }
@@ -21,6 +24,12 @@ pub type RpcError {
 /// Open a WebSocket RPC session. The connection opens lazily on first call.
 @external(javascript, "./client_ffi.mjs", "connect")
 pub fn connect(url: String) -> Stub
+
+/// Call the API over HTTP: each call is one POST to `url`, carrying the
+/// page's cookies when it's on the same origin. Callbacks and capabilities
+/// need a WebSocket session, because a request ends with its reply.
+@external(javascript, "./client_ffi.mjs", "connectHttp")
+pub fn connect_http(url: String) -> Stub
 
 /// The WebSocket URL for `path` on the page's own origin, e.g. "/rpc".
 @external(javascript, "./client_ffi.mjs", "sameOriginUrl")
@@ -39,7 +48,7 @@ pub fn call(
   decoder: Decoder(a),
 ) -> Promise(Result(a, RpcError)) {
   use reply <- promise.map(do_call(stub, method, args))
-  use value <- result.try(result.map_error(reply, Remote))
+  use value <- result.try(reply)
   decode.run(value, decoder) |> result.map_error(Decode)
 }
 
@@ -72,7 +81,7 @@ fn do_call(
   stub: Stub,
   method: String,
   args: List(Plain),
-) -> Promise(Result(Dynamic, String))
+) -> Promise(Result(Dynamic, RpcError))
 
 @external(javascript, "./plain_ffi.mjs", "identity")
 fn unsafe_stub(value: Dynamic) -> Stub
