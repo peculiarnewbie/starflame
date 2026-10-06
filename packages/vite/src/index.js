@@ -17,32 +17,35 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { Plugin, ViteDevServer } from "vite";
 
 const SOURCE = /\.(gleam|mjs|js|ts)$/;
 const BUNDLE = "\0starflame-bundle:";
 
-export interface Options {
-  /**
-   * Generate RPC code with starflame_rpc_kit. By default, on when the app
-   * depends on it. Pass `{ api, out }` for the kit's `--api` and `--out`.
-   */
-  rpc?: boolean | { api?: string; out?: string };
-}
-
-export function gleam(options: Options = {}): Plugin {
+/**
+ * @param {import("./index.js").Options} [options]
+ * @returns {import("vite").Plugin}
+ */
+export function gleam(options = {}) {
   let root = process.cwd();
   let output = "";
   let serving = false;
   let rpc = false;
-  let running: Promise<boolean> | null = null;
+  /** @type {Promise<boolean> | null} */
+  let running = null;
   let queued = false;
   let queuedGenerate = false;
   // Files the kit just wrote, whose change events shouldn't trigger a rebuild.
-  const written = new Set<string>();
+  /** @type {Set<string>} */
+  const written = new Set();
 
-  const run = (command: string, args: string[], quiet: boolean) =>
-    new Promise<{ ok: boolean; output: string }>((resolve) => {
+  /**
+   * @param {string} command
+   * @param {string[]} args
+   * @param {boolean} quiet
+   * @returns {Promise<{ ok: boolean; output: string }>}
+   */
+  const run = (command, args, quiet) =>
+    new Promise((resolve) => {
       const child = spawn(command, args, {
         cwd: root,
         stdio: quiet ? ["ignore", "pipe", "pipe"] : "inherit",
@@ -54,7 +57,11 @@ export function gleam(options: Options = {}): Plugin {
       child.on("exit", (code) => resolve({ ok: code === 0, output }));
     });
 
-  const kit = async (command: "generate" | "check"): Promise<boolean> => {
+  /**
+   * @param {"generate" | "check"} command
+   * @returns {Promise<boolean>}
+   */
+  const kit = async (command) => {
     const flags = typeof options.rpc === "object" ? options.rpc : {};
     const args = ["run", "--no-print-progress", "-m", "starflame_rpc_kit", "--", command];
     if (flags.api) args.push("--api", flags.api);
@@ -72,20 +79,28 @@ export function gleam(options: Options = {}): Plugin {
     return true;
   };
 
-  /** Whether a change to `file` can change the generated RPC code. */
-  const affectsApi = (file: string) => {
+  /**
+   * Whether a change to `file` can change the generated RPC code.
+   * @param {string} file
+   */
+  const affectsApi = (file) => {
     if (!rpc || !file.endsWith(".gleam")) return false;
     const path = resolve(root, "build/starflame_rpc_kit/sources.json");
     if (!existsSync(path)) return true;
     try {
-      const { sources } = JSON.parse(readFileSync(path, "utf8")) as { sources: string[] };
+      /** @type {{ sources: string[] }} */
+      const { sources } = JSON.parse(readFileSync(path, "utf8"));
       return sources.some((source) => resolve(root, source) === file);
     } catch {
       return true;
     }
   };
 
-  const build = (generate = false): Promise<boolean> => {
+  /**
+   * @param {boolean} [generate]
+   * @returns {Promise<boolean>}
+   */
+  const build = (generate = false) => {
     if (running) {
       queued = true;
       queuedGenerate ||= generate;
@@ -107,16 +122,19 @@ export function gleam(options: Options = {}): Plugin {
     return running;
   };
 
-  const isCompiledGleam = (id: string) => id.startsWith(output);
+  /** @param {string} id */
+  const isCompiledGleam = (id) => id.startsWith(output);
 
   // Rolldown ships with Vite 8, so resolve it from Vite's own location.
+  /** @returns {Promise<typeof import("rolldown")>} */
   const loadRolldown = async () => {
     const vite = createRequire(`${root}/package.json`).resolve("vite");
     const path = createRequire(vite).resolve("rolldown");
-    return (await import(pathToFileURL(path).href)) as typeof import("rolldown");
+    return import(pathToFileURL(path).href);
   };
 
-  const bundle = async (entry: string) => {
+  /** @param {string} entry */
+  const bundle = async (entry) => {
     const { rolldown } = await loadRolldown();
     const result = await rolldown({
       input: entry,
@@ -181,7 +199,7 @@ export function gleam(options: Options = {}): Plugin {
       return bundle(id.slice(BUNDLE.length));
     },
 
-    configureServer(server: ViteDevServer) {
+    configureServer(server) {
       const src = `${root}/src`;
       const client = server.environments.client;
 
@@ -201,7 +219,11 @@ export function gleam(options: Options = {}): Plugin {
   };
 }
 
-function usesRpcKit(root: string): boolean {
+/**
+ * @param {string} root
+ * @returns {boolean}
+ */
+function usesRpcKit(root) {
   const path = `${root}/gleam.toml`;
   return existsSync(path) && /^\s*starflame_rpc_kit\s*=/m.test(readFileSync(path, "utf8"));
 }

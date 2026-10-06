@@ -23,5 +23,12 @@ date rather than changing sources. Pass `gleam({ rpc: false })` to turn this
 off, or `gleam({ rpc: { api: "todos/rpc", out: "todos/rpc_generated" } })`
 for the kit's `--api` and `--out`.
 
-Run `pnpm build` to produce ESM and TypeScript declarations in `dist/`.
-`pnpm pack` builds and packages this library without publishing it.
+The plugin is plain JavaScript with type annotations in comments, plus a
+hand-written `index.d.ts`, so it runs without a build step. That lets an
+app install it straight from git:
+
+```json
+"@starflame/vite": "github:peculiarnewbie/starflame#<commit>&path:/packages/vite"
+```
+
+`pnpm typecheck` checks the source against the declarations.
