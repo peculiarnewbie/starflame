@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>canvas · starflame</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1115;
+        --panel: #171a20;
+        --line: #272c35;
+        --text: #e9edf3;
+        --muted: #8b94a3;
+        --accent: #7cc4ff;
+        --danger: #ff8b7d;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; background: var(--bg); color: var(--text); }
+      .app { max-width: 72rem; height: 100dvh; margin: 0 auto; padding: 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .brand { display: flex; align-items: baseline; gap: 0.6rem; }
+      h1 { margin: 0; font-size: 1.35rem; letter-spacing: -0.02em; }
+      .online { color: var(--muted); font-size: 0.8rem; }
+      .tools { display: flex; gap: 0.4rem; }
+      .btn { padding: 0.5rem 0.85rem; font: inherit; font-weight: 600; color: var(--text); background: rgba(255,255,255,0.07); border: 1px solid var(--line); border-radius: 0.5rem; cursor: pointer; }
+      .btn:hover { background: rgba(255,255,255,0.14); }
+
+      .error { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0.8rem; border-radius: 0.55rem; background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); font-size: 0.85rem; }
+      .link { border: none; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; }
+
+      .board-wrap { position: relative; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--panel); overflow: hidden; }
+      .board { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+      .badge { position: absolute; top: 0.6rem; left: 0.6rem; padding: 0.2rem 0.55rem; border-radius: 999px; background: rgba(0,0,0,0.55); border: 1px solid var(--line); color: var(--muted); font-size: 0.72rem; }
+      .hint { margin: 0; color: var(--muted); font-size: 0.78rem; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
