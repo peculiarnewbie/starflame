@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>blackjack · starflame</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --felt: #0f3d2e;
+        --felt-deep: #0a2b21;
+        --card: #fdfcf8;
+        --ink: #1d1b16;
+        --text: #f2f1ea;
+        --muted: #9db3a8;
+        --line: #2c5949;
+        --gold: #e8c56a;
+        --red: #d2453a;
+        --danger: #ff8b7d;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 50% 0%, #1c5a45 0%, var(--felt) 45%, var(--felt-deep) 100%);
+      }
+      .app { max-width: 56rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .brand { display: flex; align-items: baseline; gap: 0.6rem; }
+      h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.03em; font-weight: 650; }
+      .table-name { color: var(--gold); font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+      .connection { font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+      .connection::before { content: "●"; margin-right: 0.35rem; }
+      .connection.online::before { color: #4be08b; }
+      .connection.connecting::before { color: var(--gold); }
+      .connection.offline::before { color: var(--danger); }
+
+      .error { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; padding: 0.6rem 0.9rem; border-radius: 0.6rem; background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); font-size: 0.9rem; }
+      .link { border: none; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; }
+
+      .join { margin-top: 3rem; max-width: 26rem; }
+      .tagline { color: var(--muted); line-height: 1.5; }
+      .join form { display: flex; gap: 0.5rem; margin-top: 1.25rem; }
+      .name-input, .bet-input {
+        flex: 1; min-width: 0; padding: 0.7rem 0.9rem; font: inherit; color: var(--text);
+        background: rgba(0, 0, 0, 0.25); border: 1px solid var(--line); border-radius: 0.6rem; outline: none;
+      }
+      .name-input:focus, .bet-input:focus { border-color: var(--gold); }
+
+      .table { margin-top: 1.5rem; }
+      .meta { display: flex; gap: 1rem; color: var(--muted); font-size: 0.8rem; }
+      .turn { color: var(--gold); }
+
+      .dealer, .seat {
+        margin-top: 1rem; padding: 0.9rem 1rem; border-radius: 0.9rem;
+        border: 1px solid var(--line); background: rgba(0, 0, 0, 0.22);
+      }
+      .dealer { border-color: #3c7a63; }
+      .seat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+      .who { font-weight: 600; }
+      .value { color: var(--gold); font-variant-numeric: tabular-nums; }
+      .chips { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+      .seat.mine { border-color: var(--gold); }
+      .seat.turn { box-shadow: 0 0 0 1px var(--gold) inset, 0 0 24px -8px var(--gold); }
+      .hand.turn { outline: 1px solid var(--gold); }
+      .waiting { color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }
+
+      .seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.75rem; }
+      .cards { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+      .card {
+        width: 3.1rem; height: 4.4rem; border-radius: 0.45rem; background: var(--card); color: var(--ink);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); font-weight: 700; line-height: 1;
+      }
+      .card .rank { font-size: 1.1rem; }
+      .card .suit { display: flex; align-items: center; justify-content: center; margin-top: 0.2rem; }
+      .card.heart, .card.diamond { color: var(--red); }
+      .card.back {
+        background: repeating-linear-gradient(45deg, #2b5c8a 0 6px, #21486d 6px 12px);
+        border: 2px solid #e9e6da;
+      }
+      .hand { margin-top: 0.6rem; padding: 0.5rem; border-radius: 0.6rem; }
+      .hand-meta { color: var(--muted); font-size: 0.78rem; margin-top: 0.4rem; font-variant-numeric: tabular-nums; }
+
+      .actions { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      .btn {
+        padding: 0.55rem 1rem; font: inherit; font-weight: 600; color: var(--text);
+        background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 0.55rem; cursor: pointer;
+      }
+      .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+      .btn:disabled { opacity: 0.35; cursor: default; }
+      .btn.primary { background: var(--gold); border-color: var(--gold); color: #2a2413; }
+      .chip { padding: 0.3rem 0.6rem; font: inherit; font-size: 0.8rem; color: var(--text); background: rgba(0, 0, 0, 0.3); border: 1px dashed var(--line); border-radius: 999px; cursor: pointer; }
+      .chip:hover { border-color: var(--gold); }
+      .bet { display: flex; flex-direction: column; gap: 0.5rem; }
+      .bet-input { max-width: 8rem; flex: 0 0 auto; }
+      .presets { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+      .prompt { color: var(--muted); }
+
+      .results { margin-top: 1.5rem; padding: 1rem; border-radius: 0.9rem; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); }
+      .results h2 { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+      .result-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; padding: 0.35rem 0; font-size: 0.9rem; }
+      .outcomes { color: var(--muted); }
+      .net { font-variant-numeric: tabular-nums; font-weight: 600; }
+      .net.up { color: #4be08b; }
+      .net.down { color: var(--danger); }
+      .net.flat { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

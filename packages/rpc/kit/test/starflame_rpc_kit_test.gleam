@@ -10,37 +10,13 @@ pub fn main() -> Nil {
 
 // FIXTURES --------------------------------------------------------------------
 
-/// The RPC example has every dependency generated code needs, so fixtures
-/// borrow its gleam.toml, manifest and downloaded packages. Each test gets a
-/// fresh `src/`; the kit's scratch build in the project is reused.
+/// Each test uses independent sources and dependencies from the fixture app.
 fn project(name: String, files: List(#(String, String))) -> String {
-  let root = "build/kit-test/" <> name
-  let example = "../../../examples/rpc"
-  let packages = absolute("../..") <> "/"
-  let assert Ok(_) = simplifile.create_directory_all(root <> "/build")
-  let assert Ok(toml) = simplifile.read(example <> "/gleam.toml")
-  let assert Ok(manifest) = simplifile.read(example <> "/manifest.toml")
-  let assert Ok(_) =
-    simplifile.write(
-      root <> "/gleam.toml",
-      string.replace(toml, "\"../../packages/", "\"" <> packages),
-    )
-  let assert Ok(_) =
-    simplifile.write(
-      root <> "/manifest.toml",
-      string.replace(manifest, "\"../../packages/", "\"" <> packages),
-    )
-  case simplifile.is_directory(root <> "/build/packages") {
-    Ok(True) -> Nil
-    _ -> {
-      let assert Ok(_) =
-        simplifile.copy_directory(
-          example <> "/build/packages",
-          root <> "/build/packages",
-        )
-      Nil
-    }
-  }
+  let root = fixture_project(name)
+  let assert Ok(toml) = simplifile.read(root <> "/gleam.toml")
+  let assert Ok(toml) = toml |> string.split("[starflame]") |> list.first
+  // These existing RPC tests exercise only RPC generation.
+  let assert Ok(_) = simplifile.write(root <> "/gleam.toml", toml)
   let _ = simplifile.delete(root <> "/src")
   list.each(files, fn(file) {
     let path = root <> "/src/" <> file.0
@@ -120,7 +96,8 @@ pub type Handle {
 
 // EDGE CASES ------------------------------------------------------------------
 
-const types_module = "import gleam/dict.{type Dict}
+const types_module =
+  "import gleam/dict.{type Dict}
 import gleam/option.{type Option}
 
 /// Recursive.
@@ -173,7 +150,8 @@ pub type Clashing {
 }
 "
 
-const api_module = "import gleam/javascript/promise.{type Promise}
+const api_module =
+  "import gleam/javascript/promise.{type Promise}
 import spike/client.{type Note}
 import spike/other
 import spike/types.{
@@ -270,7 +248,8 @@ pub fn labels(
 
 /// Encodes, copies through JSON and decodes values of each type, through
 /// the fast path alone and through the full decoder.
-const roundtrip_module = "import gleam/dict
+const roundtrip_module =
+  "import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/io
@@ -407,7 +386,8 @@ pub fn edge_cases_compile_and_round_trip_test() {
 
 // CHECK -----------------------------------------------------------------------
 
-const small_api = "import gleam/javascript/promise.{type Promise}
+const small_api =
+  "import gleam/javascript/promise.{type Promise}
 import spike/types.{type Item}
 import starflame/server.{type Context}
 
@@ -603,7 +583,7 @@ pub fn generated_import_test() {
 
 pub fn compile_error_test() {
   api("pub fn get(_c: Context) -> Promise(Int) { promise.resolve(\"x\") }")
-  |> expect_error("build/kit-test/errors/src/spike/api.gleam")
+  |> expect_error("kit-test/errors/src/spike/api.gleam")
 }
 
 @external(javascript, "./starflame_rpc_kit_test_ffi.mjs", "shell")
@@ -613,8 +593,8 @@ fn shell(
   args: List(String),
 ) -> Result(String, String)
 
-@external(javascript, "./starflame_rpc_kit_test_ffi.mjs", "absolute")
-fn absolute(path: String) -> String
+@external(javascript, "./starflame_rpc_kit_test_ffi.mjs", "fixture_project")
+pub fn fixture_project(name: String) -> String
 
 pub fn only_local_dependency_paths_become_absolute_test() {
   let toml =

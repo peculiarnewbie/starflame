@@ -1,0 +1,21 @@
+import gleam/dict.{type Dict}
+import gleam/option.{type Option}
+import spike/other
+
+pub type State {
+  State(items: Dict(String, List(#(other.Item, Option(Detail)))), tree: Tree)
+}
+
+pub type Detail {
+  Active(Int)
+  Inactive
+}
+
+pub type Tree {
+  Tree(children: List(Tree))
+}
+
+// Included even though no other public type refers to it.
+pub type Unused {
+  Unused
+}

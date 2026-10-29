@@ -76,6 +76,8 @@ pub type Capability {
 pub type Api {
   Api(
     module: String,
+    /// Types-only analysis imports its root module like any other data module.
+    types_only: Bool,
     methods: List(Method),
     /// Each type comes after the types it refers to, except for the
     /// references in `lazy`.
@@ -105,7 +107,7 @@ pub fn analyse(interface: Interface, module: String) -> Result(Api, String) {
       "There's no public module " <> module <> " in " <> interface.name <> ".",
     ),
   )
-  let checker = Checker(interface:, api: module)
+  let checker = Checker(interface:, api: module, types_only: False)
   use methods <- result.try(
     api_module.functions
     |> dict.to_list
@@ -123,6 +125,7 @@ pub fn analyse(interface: Interface, module: String) -> Result(Api, String) {
       let api =
         Api(
           module:,
+          types_only: False,
           methods:,
           data: list.filter_map(order, dict.get(data, _)),
           capabilities: list.reverse(capabilities),
@@ -134,8 +137,44 @@ pub fn analyse(interface: Interface, module: String) -> Result(Api, String) {
   }
 }
 
+/// Analyses every public type defined in `module`, without treating its
+/// functions as RPC methods. Opaque, generic and function-bearing types
+/// cannot be persisted as plain values.
+pub fn analyse_types(
+  interface: Interface,
+  module: String,
+) -> Result(Api, String) {
+  use types_module <- result.try(
+    dict.get(interface.modules, module)
+    |> result.replace_error(
+      "There's no public module " <> module <> " in " <> interface.name <> ".",
+    ),
+  )
+  let checker = Checker(interface:, api: module, types_only: True)
+  use roots <- result.try(
+    types_module.types
+    |> dict.keys
+    |> list.sort(string.compare)
+    |> list.try_map(fn(name) {
+      custom(checker, module, name, [], module <> "." <> name, False)
+    }),
+  )
+  use #(seen, data, _) <- result.map(
+    collect(checker, roots, [], dict.new(), []),
+  )
+  let #(order, lazy) = dependency_order(seen, data)
+  Api(
+    module:,
+    types_only: True,
+    methods: [],
+    data: list.filter_map(order, dict.get(data, _)),
+    capabilities: [],
+    lazy:,
+  )
+}
+
 type Checker {
-  Checker(interface: Interface, api: String)
+  Checker(interface: Interface, api: String, types_only: Bool)
 }
 
 // METHODS ---------------------------------------------------------------------
@@ -343,8 +382,8 @@ fn custom(
 ) -> Result(Ty, String) {
   let ref = Ref(module, name)
   use definition <- result.try(definition(checker, ref))
-  case parameters, definition.constructors {
-    [_, ..], _ ->
+  case parameters != [] || definition.parameters > 0, definition.constructors {
+    True, _ ->
       Error(where <> ": " <> show(ref) <> " is generic, which isn't supported.")
     _, [] ->
       Error(
@@ -355,6 +394,13 @@ fn custom(
       )
     _, _ ->
       case is_capability(definition), capabilities {
+        True, _ if checker.types_only ->
+          Error(
+            where
+            <> ": "
+            <> show(ref)
+            <> " is a capability; functions cannot be encoded as plain values.",
+          )
         True, True -> Ok(CapabilityT(ref))
         True, False ->
           Error(
@@ -363,7 +409,7 @@ fn custom(
             <> show(ref)
             <> " is a capability, so it can only be returned.",
           )
-        False, _ if module == checker.api ->
+        False, _ if module == checker.api && !checker.types_only ->
           Error(
             where
             <> ": move "
@@ -463,7 +509,11 @@ fn data_type(checker: Checker, ref: Ref) -> Result(DataType, String) {
                 Fn(..) ->
                   Error(
                     where
-                    <> ": a record with functions is a capability, so all its fields must be functions.",
+                    <> case checker.types_only {
+                      True -> ": functions cannot be encoded as plain values."
+                      False ->
+                        ": a record with functions is a capability, so all its fields must be functions."
+                    },
                   )
                 type_ -> ty(checker, type_, where, False)
               })

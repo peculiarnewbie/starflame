@@ -23,6 +23,57 @@ With [`@starflame/vite`](../../vite), the dev server runs `generate` when the
 API module or a module it imports changes, and production builds run `check`.
 The kit lists those modules in `build/starflame_rpc_kit/sources.json` for it.
 
+## Standalone state codecs
+
+Generate codecs for all public types defined in a module, without adding an
+RPC method returning them:
+
+```sh
+gleam run -m starflame_rpc_kit -- codecs todos/state --out todos/state_codecs
+```
+
+This writes `src/todos/state_codecs.gleam`. Each type gets `<snake>_to_plain`,
+`<snake>_decoder`, `<snake>_from_plain` and `<snake>_kind`, using the same
+writer and representation as RPC `wire.gleam`. Dependencies on the app's
+other public types are included transitively, in dependency order. Recursive
+types use lazy kind references. Types with the same name in different
+modules get a module alias prefix, just as in `wire.gleam`.
+
+For automatic generation, add module/output pairs to the app's `gleam.toml`:
+
+```toml
+[starflame]
+codecs = ["todos/state:todos/state_codecs", "todos/history:todos/history_codecs"]
+```
+
+```sh
+gleam run -m starflame_rpc_kit -- codecs # Generate every configured entry.
+gleam run -m starflame_rpc_kit -- check  # Check RPC code and configured codecs.
+```
+
+Paths are Gleam module paths without `src/` or `.gleam`. Outputs must be
+distinct and cannot overwrite their input module. The one-off form ignores
+configured entries; only configured outputs participate in `check`. With no
+configured entries, `codecs` succeeds without writing anything.
+
+Opaque/external types, types with any type parameters (including phantom
+parameters), capabilities and function fields are rejected with an error
+naming the type or field. The other wire type restrictions also apply.
+Public functions in the types module are ignored. Unlike an RPC API module,
+the types module itself can define the data types being encoded.
+
+The Vite plugin runs `generate`, then `codecs`, then `gleam build` during dev,
+and watches the dependencies of both RPC and codecs modules, plus
+`gleam.toml`. Production `check` reports the command needed for stale files.
+Analysis and formatting finish for every configured entry before any output
+is written; each file is replaced atomically. Failed generation preserves
+previous output. A types module must not import its own generated codecs.
+The API may import standalone codecs. `gleam run` compiles the app before
+starting the kit, and RPC interface export also compiles the API's imports.
+If stale generated code no longer compiles after a type change, run an
+already compiled kit directly to regenerate the codecs before restarting
+Vite. This compiler bootstrap limitation also applies to RPC generation.
+
 ## The API module
 
 Every public function in the API module is an RPC method. Its first argument

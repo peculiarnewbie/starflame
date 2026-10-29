@@ -23,6 +23,20 @@ date rather than changing sources. Pass `gleam({ rpc: false })` to turn this
 off, or `gleam({ rpc: { api: "todos/rpc", out: "todos/rpc_generated" } })`
 for the kit's `--api` and `--out`.
 
+Standalone state codecs can be configured in the app's `gleam.toml`:
+
+```toml
+[starflame]
+codecs = ["todos/state:todos/state_codecs"]
+```
+
+Dev runs `gleam run -m starflame_rpc_kit -- codecs` after RPC generation and
+before building, and watches the codecs modules and their dependencies too.
+A generation error reports the cause and preserves the previous files.
+Production `check` also verifies configured codecs and reports the command
+to run if they are stale. To regenerate manually, run RPC `generate`, then
+`codecs`.
+
 The plugin is plain JavaScript with type annotations in comments, plus a
 hand-written `index.d.ts`, so it runs without a build step. That lets an
 app install it straight from git:

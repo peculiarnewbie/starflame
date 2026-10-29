@@ -58,17 +58,19 @@ export function gleam(options = {}) {
     });
 
   /**
-   * @param {"generate" | "check"} command
+   * @param {"generate" | "codecs" | "check"} command
    * @returns {Promise<boolean>}
    */
   const kit = async (command) => {
     const flags = typeof options.rpc === "object" ? options.rpc : {};
     const args = ["run", "--no-print-progress", "-m", "starflame_rpc_kit", "--", command];
-    if (flags.api) args.push("--api", flags.api);
-    if (flags.out) args.push("--out", flags.out);
+    if (command !== "codecs") {
+      if (flags.api) args.push("--api", flags.api);
+      if (flags.out) args.push("--out", flags.out);
+    }
     const result = await run("gleam", args, true);
     if (!result.ok) {
-      console.error(`[starflame] RPC ${command} failed:\n${result.output.trimEnd()}`);
+      console.error(`[starflame] ${command} failed:\n${result.output.trimEnd()}`);
       return false;
     }
     for (const line of result.output.split("\n")) {
@@ -80,17 +82,21 @@ export function gleam(options = {}) {
   };
 
   /**
-   * Whether a change to `file` can change the generated RPC code.
+   * Whether a change to `file` can change RPC code or configured codecs.
    * @param {string} file
    */
   const affectsApi = (file) => {
     if (!rpc || !file.endsWith(".gleam")) return false;
     const path = resolve(root, "build/starflame_rpc_kit/sources.json");
+    const codecsPath = resolve(root, "build/starflame_rpc_kit/codecs-sources.json");
     if (!existsSync(path)) return true;
     try {
       /** @type {{ sources: string[] }} */
       const { sources } = JSON.parse(readFileSync(path, "utf8"));
-      return sources.some((source) => resolve(root, source) === file);
+      /** @type {Record<string, string[]>} */
+      const codecs = existsSync(codecsPath) ? JSON.parse(readFileSync(codecsPath, "utf8")) : {};
+      return [...sources, ...Object.values(codecs).flat()]
+        .some((source) => resolve(root, source) === file);
     } catch {
       return true;
     }
@@ -109,6 +115,8 @@ export function gleam(options = {}) {
     running = (async () => {
       // A failed generate leaves the old code; the error says what to fix.
       if (generate && !(await kit("generate"))) return false;
+      // Regenerate configured state codecs after RPC generation succeeds.
+      if (generate && !(await kit("codecs"))) return false;
       return (await run("gleam", ["build"], false)).ok;
     })().finally(() => {
       running = null;
@@ -177,7 +185,7 @@ export function gleam(options = {}) {
       // Dev keeps the RPC code current; a production build only checks it,
       // rather than changing sources.
       if (rpc && !serving && !(await kit("check"))) {
-        this.error("the generated RPC code is out of date: run `gleam run -m starflame_rpc_kit -- generate`");
+        this.error("the generated RPC code or codecs are out of date: run `gleam run -m starflame_rpc_kit -- generate` then `gleam run -m starflame_rpc_kit -- codecs` (see kit output for configured paths)");
       }
       if (!(await build(rpc && serving))) this.error("gleam build failed");
     },
@@ -201,14 +209,20 @@ export function gleam(options = {}) {
 
     configureServer(server) {
       const src = `${root}/src`;
+      const config = `${root}/gleam.toml`;
       const client = server.environments.client;
 
       server.watcher.add(src);
+      server.watcher.add(config);
       server.watcher.on("change", async (file) => {
-        if (!SOURCE.test(file) || relative(src, file).startsWith("..")) return;
+        const configChanged = file === config;
+        if (!configChanged && (!SOURCE.test(file) || relative(src, file).startsWith(".."))) return;
+        if (configChanged) {
+          rpc = options.rpc === undefined ? usesRpcKit(root) : options.rpc !== false;
+        }
         // The kit's own writes are already part of the build that made them.
         if (written.delete(file)) return;
-        if (!(await build(affectsApi(file)))) return;
+        if (!(await build(rpc && (configChanged || affectsApi(file))))) return;
         for (const module of client.moduleGraph.idToModuleMap.values()) {
           if (module.id?.startsWith(BUNDLE))
             client.moduleGraph.invalidateModule(module);

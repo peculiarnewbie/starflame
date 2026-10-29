@@ -11,6 +11,8 @@
 //// By default the API is `<app>/api` and the code goes to
 //// `src/<app>/generated/`. `--api todos/rpc` and `--out todos/rpc_generated`
 //// change them; pass the same flags to `check`.
+//// Standalone codecs use `codecs <module> --out <module path>`, or `codecs`
+//// for every entry in `[starflame].codecs`. `check` includes those entries.
 
 import argv
 import gleam/io
@@ -33,9 +35,11 @@ pub fn main() -> Nil {
   }
 }
 
-const usage = "Usage:
+const usage =
+  "Usage:
   generate [--api <module>] [--out <module path>]
-  check [--api <module>] [--out <module path>]"
+  check [--api <module>] [--out <module path>]
+  codecs [<module> --out <module path>]"
 
 type Command {
   Generate
@@ -48,6 +52,24 @@ type Config {
 
 /// Runs a command for the app in `root`.
 pub fn run(root: String, arguments: List(String)) -> Result(String, String) {
+  case arguments {
+    ["codecs", ..flags] -> {
+      use entries <- result.try(case flags {
+        [] -> configured_codecs(root)
+        [module, "--out", out] -> validate_codec_entries([#(module, out)])
+        _ -> Error(usage)
+      })
+      use files <- result.try(codec_files(root, entries))
+      case files {
+        [] -> Ok("No codecs configured in [starflame].codecs.")
+        _ -> write(root, files)
+      }
+    }
+    _ -> run_rpc(root, arguments)
+  }
+}
+
+fn run_rpc(root: String, arguments: List(String)) -> Result(String, String) {
   use #(command, flags) <- result.try(case arguments {
     ["generate", ..flags] -> Ok(#(Generate, flags))
     ["check", ..flags] -> Ok(#(Check, flags))
@@ -62,7 +84,15 @@ pub fn run(root: String, arguments: List(String)) -> Result(String, String) {
   use files <- result.try(files(root, config))
   case command {
     Generate -> write(root, files)
-    Check -> check(root, files)
+    Check -> {
+      use entries <- result.try(configured_codecs(root))
+      use codecs <- result.try(codec_files(root, entries))
+      let generate_command =
+        "generate --api " <> config.api <> " --out " <> config.out
+      use rpc_status <- result.try(check(root, files, generate_command))
+      use codec_status <- result.map(check(root, codecs, "codecs"))
+      rpc_status <> "\n" <> codec_status
+    }
   }
 }
 
@@ -109,7 +139,7 @@ fn files(
   root: String,
   config: Config,
 ) -> Result(List(#(String, String)), String) {
-  use json <- result.try(export_interface(root, config.api, config.out))
+  use json <- result.try(export_interface(root, config.api, config.out, False))
   use interface <- result.try(interface.parse(json))
   use api <- result.try(model.analyse(interface, config.api))
   use output <- result.try(codegen.generate(api, config.out))
@@ -123,6 +153,30 @@ fn files(
     #(dir <> "client.gleam", client),
     #(dir <> "targets.ts", output.targets),
   ])
+}
+
+fn configured_codecs(root: String) -> Result(List(#(String, String)), String) {
+  use toml <- result.try(
+    simplifile.read(root <> "/gleam.toml")
+    |> result.replace_error("There's no gleam.toml in " <> root <> "."),
+  )
+  use entries <- result.try(codec_entries(toml))
+  validate_codec_entries(entries)
+}
+
+fn codec_files(
+  root: String,
+  entries: List(#(String, String)),
+) -> Result(List(#(String, String)), String) {
+  list.try_map(entries, fn(entry) {
+    let #(module, out) = entry
+    use json <- result.try(export_interface(root, module, out, True))
+    use interface <- result.try(interface.parse(json))
+    use types <- result.try(model.analyse_types(interface, module))
+    use source <- result.try(codegen.generate_codecs(types, out))
+    use source <- result.map(format(source))
+    #("src/" <> out <> ".gleam", source)
+  })
 }
 
 fn write(
@@ -145,13 +199,10 @@ fn write(
               <> simplifile.describe_error(error)
             }),
           )
-          simplifile.write(full, content)
+          atomic_write(full, content)
           |> result.map(fn(_) { "Wrote " <> path })
           |> result.map_error(fn(error) {
-            "Couldn't write "
-            <> path
-            <> ": "
-            <> simplifile.describe_error(error)
+            "Couldn't write " <> path <> ": " <> error
           })
         }
       }
@@ -163,6 +214,7 @@ fn write(
 fn check(
   root: String,
   files: List(#(String, String)),
+  command: String,
 ) -> Result(String, String) {
   let stale =
     list.filter_map(files, fn(file) {
@@ -174,11 +226,21 @@ fn check(
       }
     })
   case stale {
-    [] -> Ok("The generated RPC code is up to date.")
+    [] ->
+      Ok(
+        "The generated "
+        <> case command {
+          "codecs" -> "codecs are"
+          _ -> "RPC code is"
+        }
+        <> " up to date.",
+      )
     _ ->
       Error(
         string.join(stale, "\n")
-        <> "\nRun `gleam run -m starflame_rpc_kit -- generate`.",
+        <> "\nRun `gleam run -m starflame_rpc_kit -- "
+        <> command
+        <> "`.",
       )
   }
 }
@@ -201,4 +263,16 @@ fn export_interface(
   root: String,
   api: String,
   generated: String,
+  types_only: Bool,
 ) -> Result(String, String)
+
+@external(javascript, "./starflame_rpc_kit_ffi.mjs", "codec_entries")
+fn codec_entries(toml: String) -> Result(List(#(String, String)), String)
+
+@external(javascript, "./starflame_rpc_kit_ffi.mjs", "validate_codec_entries")
+fn validate_codec_entries(
+  entries: List(#(String, String)),
+) -> Result(List(#(String, String)), String)
+
+@external(javascript, "./starflame_rpc_kit_ffi.mjs", "atomic_write")
+fn atomic_write(path: String, content: String) -> Result(Nil, String)

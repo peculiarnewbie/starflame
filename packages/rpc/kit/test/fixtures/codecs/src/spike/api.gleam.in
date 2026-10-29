@@ -1,0 +1,6 @@
+import spike/other
+import starflame/server.{type Context}
+
+pub fn ping(_context: Context) -> other.Item {
+  other.Item("pong")
+}
