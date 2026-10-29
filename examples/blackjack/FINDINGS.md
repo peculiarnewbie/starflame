@@ -97,16 +97,14 @@ id from its hash, passes it to `newApi` as `auth`, and never accepts a player id
 in a call. Actions no longer carry one, so impersonation is structurally
 impossible.
 
-That is the pattern a framework should ship, but the runtime offers no help:
-there is no cookie/HttpOnly helper, no expiry or rotation, and no way to bind a
-verified identity to a WebSocket session other than doing it in the Worker
-yourself. The token here is a bearer credential in `localStorage` sent as a
-query parameter; fine for a demo, not for production.
+That is the pattern a framework should ship, and it now has a helper:
+`@starflame/runtime/session.ts` issues tokens, reads them back, and derives the
+player id, so apps no longer copy that code. What remains demo-grade is the
+token itself: a bearer credential in `localStorage`, no HttpOnly cookie, no
+expiry or rotation.
 
-**Suggestion:** a `starflame/session` helper that issues an HttpOnly cookie,
-exposes `auth` to the API, and documents rotation and expiry. Combined with the
-existing `newApi(env, execution, auth)` seam, this would be a small addition
-with a large payoff.
+**Suggestion:** a cookie-based mode with rotation and expiry, and a documented
+answer for "the socket outlives the token".
 
 ### 5. Per-subscriber views are manual
 

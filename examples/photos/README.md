@@ -25,8 +25,9 @@ Then open `http://localhost:5173/` and upload a PNG, JPEG, WebP or GIF under
 - **HTTP RPC.** There's no Durable Object: the Worker calls
   `newWorkersRpcResponse(request, newApi(...))` directly, and the client uses
   `connect_http`, one request per call.
-- **Sessions.** `GET /session` issues a token; the owner id is a hash of it, so
-  the UI can show "yours" without exposing the credential.
+- **Sessions.** `@starflame/runtime/session.ts` issues a token and derives the
+  owner id from its hash, so the UI can show "yours" without exposing the
+  credential.
 
 | File | Contents |
 | --- | --- |

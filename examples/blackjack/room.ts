@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { fromRequest } from "@starflame/runtime/session.ts";
 import { newWorkersRpcResponse, RpcTarget, type RpcStub } from "capnweb";
 import { newApi } from "./build/dev/javascript/blackjack/blackjack/generated/targets.ts";
 
@@ -59,12 +60,9 @@ export class BlackjackTable extends DurableObject<Env> {
   }
 
   async fetch(request: Request) {
-    const session = new URL(request.url).searchParams.get("session") ?? "";
-    if (session.length < 8 || session.length > 128) {
-      return new Response("Missing session", { status: 401 });
-    }
-    const player = await playerId(session);
-    return newWorkersRpcResponse(request, new TableApi(this, player));
+    const session = await fromRequest(request);
+    if (!session) return new Response("Missing session", { status: 401 });
+    return newWorkersRpcResponse(request, new TableApi(this, session.player));
   }
 }
 
@@ -133,14 +131,4 @@ class TableApi extends RpcTarget {
     this.#listener?.[Symbol.dispose]();
     this.#listener = undefined;
   }
-}
-
-// The session token is a bearer credential, so it never appears in a view. The
-// player id is a hash of it: stable across reconnects, useless for forging.
-async function playerId(session: string): Promise<string> {
-  const encoded = new TextEncoder().encode(session);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest).slice(0, 8))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 }

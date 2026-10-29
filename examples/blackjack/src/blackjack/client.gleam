@@ -236,9 +236,17 @@ pub fn view(model: Model) -> Element(Msg) {
     error_banner(model.error),
     case model.view {
       None -> join_screen(model)
-      Some(table) -> table_view(model, table)
+      Some(table) ->
+        case is_seated(table) {
+          False -> join_screen(model)
+          True -> table_view(model, table)
+        }
     },
   ])
+}
+
+fn is_seated(table: View) -> Bool {
+  list.any(table.players, fn(player) { player.id == table.my_id })
 }
 
 fn join_screen(model: Model) -> Element(Msg) {

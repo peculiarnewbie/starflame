@@ -45,7 +45,7 @@ across a Worker restart, and table isolation.
 | RPC | `src/blackjack/api.gleam` | `join`, `act`, `refresh`, `subscribe` |
 | Codecs | `src/blackjack/codecs.gleam` | Generated from `shared.gleam` by the RPC kit. |
 | Persistence | `src/blackjack/store.gleam` | The table as one JSON row in D1. |
-| Sessions | `worker.ts` | `GET /session` issues a token; `/rpc` requires one. |
+| Sessions | `@starflame/runtime/session.ts` | `issue()` mints a token; `fromRequest()` derives the player id. |
 | Table | `room.ts` | One Durable Object per table: identity, serialize, broadcast. |
 | UI | `src/blackjack/client.gleam` | Lustre app. |
 

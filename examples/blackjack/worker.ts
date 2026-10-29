@@ -1,20 +1,16 @@
 // The Worker entrypoint: sessions, and one Durable Object per table.
 
+import { fromRequest, issue } from "@starflame/runtime/session.ts";
+import { newWorkersRpcResponse } from "capnweb";
+import { newApi } from "./build/dev/javascript/blackjack/blackjack/generated/targets.ts";
+
 export { BlackjackTable } from "./room.ts";
 
 export default {
-  async fetch(request: Request, env: Env) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
 
-    // The browser calls this once, then keeps the token. The token is the
-    // credential: the table derives a player id from it and never reads one
-    // from the arguments.
-    if (url.pathname === "/session") {
-      return Response.json(
-        { session: crypto.randomUUID() },
-        { headers: { "cache-control": "no-store" } },
-      );
-    }
+    if (url.pathname === "/session") return issue();
 
     if (url.pathname === "/rpc") {
       // Cap'n Web doesn't check Origin, and browsers allow cross-site
@@ -23,10 +19,8 @@ export default {
       if (origin !== null && origin !== url.origin) {
         return new Response("Forbidden origin", { status: 403 });
       }
-      const session = url.searchParams.get("session") ?? "";
-      if (session.length < 8 || session.length > 128) {
-        return new Response("Missing session", { status: 401 });
-      }
+      const session = await fromRequest(request);
+      if (!session) return new Response("Missing session", { status: 401 });
       return env.TABLE.getByName(tableName(url.searchParams.get("table"))).fetch(
         request,
       );
