@@ -2,6 +2,10 @@ import gleam/dict.{type Dict}
 import gleam/option.{type Option}
 import spike/other
 
+pub type Upload {
+  Upload(bytes: BitArray, chunks: List(BitArray), metadata: #(BitArray, String))
+}
+
 pub type State {
   State(items: Dict(String, List(#(other.Item, Option(Detail)))), tree: Tree)
 }

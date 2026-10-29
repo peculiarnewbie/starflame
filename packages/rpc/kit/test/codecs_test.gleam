@@ -17,12 +17,16 @@ pub fn codecs_cli_and_freshness_test() {
   let assert Ok(source) = simplifile.read(path)
   let assert True = string.contains(source, "import spike/types")
   let assert True = string.contains(source, "import spike/other")
-  list.each(["state", "detail", "tree", "unused", "item"], fn(name) {
+  list.each(["state", "detail", "tree", "unused", "item", "upload"], fn(name) {
     list.each(["_to_plain", "_decoder", "_from_plain", "_kind"], fn(suffix) {
       let assert True = string.contains(source, name <> suffix)
       Nil
     })
   })
+  let assert True = string.contains(source, "plain.bit_array(")
+  let assert True = string.contains(source, "plain.bit_array_decoder()")
+  let assert True = string.contains(source, "fast_decode.BytesKind")
+  let assert True = string.contains(source, "fast_decode.bit_array(")
   let assert Ok(_) = shell(root, "gleam", ["build", "--warnings-as-errors"])
   let assert Ok(_) =
     shell(root, "gleam", ["run", "-m", "starflame_rpc_kit", "--", "check"])

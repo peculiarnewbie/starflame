@@ -34,6 +34,8 @@ pub type Kind {
   StringKind
   /// Whatever `decode.bool` accepts: `true` and `false`.
   BoolKind
+  /// Whatever `plain.bit_array_decoder` accepts: Uint8Array or ArrayBuffer.
+  BytesKind
   /// Whatever `d1.bool_decoder` accepts: 0 and 1.
   ZeroOrOneKind
   /// Whatever `plain.nil_decoder` accepts: `null` and `undefined`.
@@ -100,6 +102,10 @@ pub fn get(object: Dynamic, name: String) -> a
 /// is already the Gleam value.
 @external(javascript, "./fast_decode_ffi.mjs", "identity")
 pub fn coerce(value: Dynamic) -> a
+
+/// A matched `BytesKind` value, converted to a Gleam BitArray.
+@external(javascript, "./plain_ffi.mjs", "bytes_to_bit_array")
+pub fn bit_array(value: Dynamic) -> BitArray
 
 /// A matched `VariantsKind` value's tag.
 pub fn tag(object: Dynamic) -> String {

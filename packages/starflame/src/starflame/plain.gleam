@@ -5,6 +5,7 @@
 ////
 //// Wire format:
 //// - Int, Float, String, Bool are themselves; Nil is `null`.
+//// - Byte-aligned BitArrays are `Uint8Array` bytes.
 //// - List and tuples are arrays.
 //// - Option is `null` or the inner value.
 //// - Dict(String, a) is an object.
@@ -30,6 +31,10 @@ pub fn string(value: String) -> Plain
 
 @external(javascript, "./plain_ffi.mjs", "identity")
 pub fn bool(value: Bool) -> Plain
+
+/// Encodes bytes for Cap'n Web. Panics if the bit size isn't a multiple of 8.
+@external(javascript, "./plain_ffi.mjs", "bit_array")
+pub fn bit_array(value: BitArray) -> Plain
 
 @external(javascript, "./plain_ffi.mjs", "null_")
 pub fn null() -> Plain
@@ -86,6 +91,22 @@ pub fn unsafe_reference(value: a) -> Plain
 pub fn to_dynamic(value: Plain) -> Dynamic
 
 // DECODERS --------------------------------------------------------------------
+
+/// Decodes `Uint8Array` or `ArrayBuffer` bytes as a Gleam BitArray.
+/// The decoded value shares the bytes' backing buffer.
+pub fn bit_array_decoder() -> Decoder(BitArray) {
+  use value <- decode.then(decode.dynamic)
+  case is_bytes(value) {
+    True -> decode.success(bytes_to_bit_array(value))
+    False -> decode.failure(<<>>, "BitArray (bytes)")
+  }
+}
+
+@external(javascript, "./plain_ffi.mjs", "is_bytes")
+fn is_bytes(value: Dynamic) -> Bool
+
+@external(javascript, "./plain_ffi.mjs", "bytes_to_bit_array")
+fn bytes_to_bit_array(value: Dynamic) -> BitArray
 
 /// Decodes `null` or `undefined` as `Nil`.
 pub fn nil_decoder() -> Decoder(Nil) {

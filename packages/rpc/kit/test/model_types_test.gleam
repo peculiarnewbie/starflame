@@ -73,6 +73,18 @@ pub fn analyse_types_orders_nested_custom_dependencies_test() {
   ])
 }
 
+pub fn analyse_types_maps_bit_array_to_bytes_test() {
+  let assert Ok(types) =
+    model.analyse_types(
+      package([#("Upload", definition([Named("", "gleam", "BitArray", [])]))]),
+      root,
+    )
+  let assert [data] = types.data
+  let assert [model.Variant(fields: [field], ..)] = data.variants
+  let assert model.BytesT = field.ty
+  let assert [] = model.refs(model.BytesT)
+}
+
 pub fn analyse_types_relaxes_root_rule_and_imports_root_test() {
   let assert Ok(types) =
     model.analyse_types(

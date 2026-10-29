@@ -1,6 +1,8 @@
 import { toList } from "../gleam.mjs";
+import { is_bytes } from "./plain_ffi.mjs";
 import {
   BoolKind,
+  BytesKind,
   DictKind,
   FloatKind,
   IntKind,
@@ -25,6 +27,7 @@ export function matches(value, kind) {
   if (kind instanceof IntKind) return Number.isInteger(value);
   if (kind instanceof SafeIntKind) return Number.isSafeInteger(value);
   if (kind instanceof BoolKind) return value === true || value === false;
+  if (kind instanceof BytesKind) return is_bytes(value);
   if (kind instanceof FloatKind) return typeof value === "number";
   if (kind instanceof ListKind) return isList(value, kind.item);
   if (kind instanceof OptionKind) {

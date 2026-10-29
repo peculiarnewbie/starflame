@@ -20,8 +20,8 @@ import gleam/set
 import gleam/string
 import starflame_rpc_kit/model.{
   type Api, type DataType, type Field, type Method, type Param, type Ref,
-  type Ty, type Variant, BoolT, Callback, CapabilityT, DataT, DictT, FloatT,
-  IntT, ListT, NilT, OptionT, ResultT, StringT, TupleT, Value,
+  type Ty, type Variant, BoolT, BytesT, Callback, CapabilityT, DataT, DictT,
+  FloatT, IntT, ListT, NilT, OptionT, ResultT, StringT, TupleT, Value,
 }
 
 pub type Output {
@@ -170,6 +170,7 @@ fn annotation(scope: Scope, ty: Ty, client: Bool) -> String {
     FloatT -> "Float"
     StringT -> "String"
     BoolT -> "Bool"
+    BytesT -> "BitArray"
     NilT -> "Nil"
     ListT(item) -> "List(" <> inner(item) <> ")"
     OptionT(some) -> "option.Option(" <> inner(some) <> ")"
@@ -224,6 +225,7 @@ fn encoder(scope: Scope, ty: Ty) -> String {
     FloatT -> "plain.float"
     StringT -> "plain.string"
     BoolT -> "plain.bool"
+    BytesT -> "plain.bit_array"
     NilT -> "plain.nil"
     DataT(ref) -> scope.wire <> name(scope, ref) <> "_to_plain"
     CapabilityT(ref) -> capability_prefix(ref) <> "_to_plain"
@@ -249,6 +251,7 @@ fn kind(scope: Scope, ty: Ty, owner: Option(Ref)) -> String {
     FloatT -> "fast_decode.FloatKind"
     StringT -> "fast_decode.StringKind"
     BoolT -> "fast_decode.BoolKind"
+    BytesT -> "fast_decode.BytesKind"
     NilT -> "fast_decode.NilKind"
     ListT(item) -> "fast_decode.ListKind(" <> inner(item) <> ")"
     OptionT(some) -> "fast_decode.OptionKind(" <> inner(some) <> ")"
@@ -291,6 +294,7 @@ fn build(scope: Scope, ty: Ty, source: Source) -> String {
       dynamic(source)
     IntT, _ | FloatT, _ | StringT, _ | BoolT, _ ->
       "fast_decode.coerce(" <> dynamic(source) <> ")"
+    BytesT, _ -> "fast_decode.bit_array(" <> dynamic(source) <> ")"
     NilT, _ -> "Nil"
     DataT(ref), _ ->
       scope.wire <> name(scope, ref) <> "_from_plain(" <> dynamic(source) <> ")"
@@ -339,6 +343,7 @@ fn build(scope: Scope, ty: Ty, source: Source) -> String {
 fn builder(scope: Scope, ty: Ty) -> String {
   case ty {
     IntT | FloatT | StringT | BoolT -> "fast_decode.coerce"
+    BytesT -> "fast_decode.bit_array"
     NilT -> "fn(_) { Nil }"
     DataT(ref) -> scope.wire <> name(scope, ref) <> "_from_plain"
     ListT(item) -> "fast_decode.list(_, " <> builder(scope, item) <> ")"
@@ -362,6 +367,7 @@ fn full_decoder(scope: Scope, ty: Ty) -> String {
     FloatT -> "decode.float"
     StringT -> "decode.string"
     BoolT -> "decode.bool"
+    BytesT -> "plain.bit_array_decoder()"
     NilT -> "plain.nil_decoder()"
     DataT(ref) -> scope.wire <> name(scope, ref) <> "_decoder()"
     CapabilityT(ref) -> capability_prefix(ref) <> "_decoder()"
@@ -402,8 +408,14 @@ fn full_decoder(scope: Scope, ty: Ty) -> String {
 /// The decoder for an argument or reply: the fast path where it helps.
 fn decoder(scope: Scope, ty: Ty) -> String {
   case ty {
-    IntT | FloatT | StringT | BoolT | NilT | DataT(_) | CapabilityT(_) ->
-      full_decoder(scope, ty)
+    IntT
+    | FloatT
+    | StringT
+    | BoolT
+    | BytesT
+    | NilT
+    | DataT(_)
+    | CapabilityT(_) -> full_decoder(scope, ty)
     _ ->
       case has_capability(ty) {
         True -> full_decoder(scope, ty)
@@ -436,6 +448,7 @@ fn zero(scope: Scope, ty: Ty, visiting: List(Ref)) -> Result(String, Nil) {
     FloatT -> Ok("0.0")
     StringT -> Ok("\"\"")
     BoolT -> Ok("False")
+    BytesT -> Ok("<<>>")
     NilT -> Ok("Nil")
     ListT(_) -> Ok("[]")
     OptionT(_) -> Ok("option.None")

@@ -28,6 +28,7 @@ pub type Ty {
   FloatT
   StringT
   BoolT
+  BytesT
   NilT
   ListT(item: Ty)
   OptionT(some: Ty)
@@ -310,6 +311,7 @@ fn ty(
     Named("", "gleam", "Float", []) -> Ok(FloatT)
     Named("", "gleam", "String", []) -> Ok(StringT)
     Named("", "gleam", "Bool", []) -> Ok(BoolT)
+    Named("", "gleam", "BitArray", []) -> Ok(BytesT)
     Named("", "gleam", "Nil", []) -> Ok(NilT)
     Named("", "gleam", "List", [item]) -> result.map(inner(item), ListT)
     Named("", "gleam", "Result", [ok, error]) -> {
@@ -664,7 +666,7 @@ pub fn refs(ty: Ty) -> List(Ty) {
     ListT(inner) | OptionT(inner) | DictT(inner) -> refs(inner)
     ResultT(ok, error) -> list.append(refs(ok), refs(error))
     TupleT(elements) -> list.flat_map(elements, refs)
-    IntT | FloatT | StringT | BoolT | NilT -> []
+    IntT | FloatT | StringT | BoolT | BytesT | NilT -> []
   }
 }
 
