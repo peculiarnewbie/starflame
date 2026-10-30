@@ -28,7 +28,6 @@ const options = convertV4MiniflareOptions({
   scriptPath: outfile,
   compatibilityDate: "2026-09-30",
   port: 8794,
-  d1Databases: ["DB"],
   durableObjects: {
     BOARD: { className: "CanvasBoard", useSQLite: true },
   },

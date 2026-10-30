@@ -31,7 +31,7 @@ Read-only is not a flag checked per call: the viewer's object simply has no
 `add` or `clear`, so a call fails at the capability boundary. The tests assert
 that calling `add` on a read-only board throws.
 
-- **State:** D1, one row per stroke, points stored as JSON.
+- **State:** the room's SQLite, one row per stroke, points stored as JSON.
 - **Transport:** Cap'n Web over WebSocket (capabilities are passed by
   reference, so this can't use HTTP RPC).
 - **Client:** hand-written capability calls. The kit can generate capabilities,
@@ -50,7 +50,7 @@ pnpm --filter @starflame/example-canvas test
 
 The Miniflare suite drives the capability tree with raw Cap'n Web: `enter`
 returns a stub, the read-only capability refuses `add`, validation rejects empty
-strokes and unknown colours, strokes round-trip through D1, `subscribe` receives
+strokes and unknown colours, strokes round-trip through the object's SQLite, `subscribe` receives
 live `StrokeAdded` and `Cleared` events plus presence, rooms are isolated, and
 strokes survive a restart.
 

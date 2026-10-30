@@ -1,5 +1,5 @@
 //// The board's backend. The capability objects in room.ts call these methods;
-//// the browser never calls them directly.
+//// the browser never calls them directly. Storage is the object's SQLite.
 
 import canvas/codecs
 import canvas/shared.{
@@ -8,9 +8,9 @@ import canvas/shared.{
 }
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
-import gleam/javascript/promise.{type Promise}
 import gleam/list
-import starflame/d1
+import gleam/string
+import starflame/do_sql as sql
 import starflame/plain
 import starflame/server
 
@@ -28,10 +28,10 @@ const schema =
 pub fn add_stroke(
   context: server.Context,
   draft draft: StrokeDraft,
-) -> Promise(Result(Stroke, CanvasError)) {
+) -> Result(Stroke, CanvasError) {
   let #(author, room) = identity(context)
   case validate(draft) {
-    Error(error) -> promise.resolve(Error(error))
+    Error(error) -> Error(error)
     Ok(Nil) -> {
       let stroke =
         Stroke(
@@ -44,47 +44,47 @@ pub fn add_stroke(
         )
       use db <- with_db(context)
       use _ <-
-        or_reject(d1.run(
+        or_reject(sql.run(
           db,
           "INSERT INTO strokes (id, room, author, points, color, width, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)",
           [
-            d1.string(stroke.id),
-            d1.string(room),
-            d1.string(stroke.author),
-            d1.string(points_json(stroke.points)),
-            d1.string(stroke.color),
-            d1.float(stroke.width),
-            d1.int(stroke.created_at),
+            sql.string(stroke.id),
+            sql.string(room),
+            sql.string(stroke.author),
+            sql.string(points_json(stroke.points)),
+            sql.string(stroke.color),
+            sql.float(stroke.width),
+            sql.int(stroke.created_at),
           ],
         ))
-      promise.resolve(Ok(stroke))
+      Ok(stroke)
     }
   }
 }
 
-pub fn snapshot(context: server.Context) -> Promise(List(Stroke)) {
+pub fn snapshot(context: server.Context) -> List(Stroke) {
   let #(_, room) = identity(context)
   use db <- with_db(context)
   use rows <-
-    or_reject(d1.all(
+    or_reject(sql.all(
       db,
       "SELECT id, author, points, color, width, created_at
        FROM strokes WHERE room = ? ORDER BY created_at ASC LIMIT 5000",
-      [d1.string(room)],
+      [sql.string(room)],
       stroke_row_decoder(),
     ))
-  promise.resolve(rows)
+  rows
 }
 
-pub fn clear(context: server.Context) -> Promise(Nil) {
+pub fn clear(context: server.Context) -> Nil {
   let #(_, room) = identity(context)
   use db <- with_db(context)
   use _ <-
-    or_reject(d1.run(db, "DELETE FROM strokes WHERE room = ?", [
-      d1.string(room),
+    or_reject(sql.run(db, "DELETE FROM strokes WHERE room = ?", [
+      sql.string(room),
     ]))
-  promise.resolve(Nil)
+  Nil
 }
 
 // VALIDATION ------------------------------------------------------------------
@@ -142,30 +142,28 @@ fn stroke_row_decoder() -> decode.Decoder(Stroke) {
   use points <- decode.field("points", points_decoder())
   use color <- decode.field("color", decode.string)
   use width <- decode.field("width", decode.float)
-  use created_at <- decode.field("created_at", d1.int_decoder())
+  use created_at <- decode.field("created_at", decode.int)
   decode.success(Stroke(id:, author:, points:, color:, width:, created_at:))
 }
 
 fn with_db(
   context: server.Context,
-  next: fn(d1.Database) -> Promise(a),
-) -> Promise(a) {
-  let db = d1.database(context, "DB")
-  use setup <- promise.await(d1.setup(db, [schema]))
-  case setup {
+  next: fn(sql.Database) -> a,
+) -> a {
+  let db = sql.database(context)
+  case sql.setup(db, [schema]) {
     Ok(Nil) -> next(db)
-    Error(error) -> panic as d1.describe(error)
+    Error(error) -> panic as sql.describe(error)
   }
 }
 
 fn or_reject(
-  query: Promise(Result(a, d1.Error)),
-  next: fn(a) -> Promise(b),
-) -> Promise(b) {
-  use result <- promise.await(query)
-  case result {
+  query: Result(a, sql.Error),
+  next: fn(a) -> b,
+) -> b {
+  case query {
     Ok(value) -> next(value)
-    Error(error) -> panic as d1.describe(error)
+    Error(error) -> panic as sql.describe(error)
   }
 }
 

@@ -26,6 +26,12 @@ pub fn env(context: Context) -> Dynamic {
   context.env
 }
 
+/// The Worker's execution context, or a Durable Object's state. Used by
+/// bindings that need the runtime, such as `do_sql`.
+pub fn execution(context: Context) -> Dynamic {
+  context.execution
+}
+
 /// What the Worker passed as `auth` to `newApi`, or `Nil` when it passed
 /// nothing. Decode it into the app's own type:
 ///

@@ -57,16 +57,20 @@ measurement.
 one) would make this testable, and would let the todo example's cost claim
 become a number too.
 
-## 4. No Durable Object storage bindings
+## 4. No Durable Object storage bindings — fixed
 
-`starflame/d1` wraps D1, but a DO's `ctx.storage.sql` has no equivalent. A chat
-room is the natural place for DO SQLite: per-room data, colocated with the
-socket. The example uses D1 instead because that's what the runtime supports,
-which means every message write leaves the object's storage.
+`starflame/do_sql` now wraps `ctx.storage.sql`, reading the object state through
+`execution(context)`: `database`, `setup`, `run` (rows written), and `all` with
+decoders, plus typed values. Calls are synchronous because the database lives in
+the object, so the chat API dropped its Promises.
 
-**Suggestion:** `starflame/do_sql` with the same shape as `d1` (`all`, `run`,
-`first`, decoders), reading `ctx.storage.sql` from the context. That is a
-contained addition and unlocks the "one DO per entity" pattern properly.
+This unlocks the "one DO per entity" pattern: history stays in the room, with no
+D1 round trip per message.
+
+**Still missing:** transactions (you can `exec("BEGIN")` by hand, but there is no
+helper), a `first`/`Option` shorthand, migration versioning, and an `Error` shape
+as rich as D1's. The module also assumes the object was created with
+`storage: "sqlite"`; otherwise it throws.
 
 ## 5. Two endpoints, one session helper
 

@@ -14,7 +14,8 @@ import starflame/server
 
 pub fn history(context: server.Context) -> promise.Promise(plain.Plain) {
   api.history(context)
-  |> promise.map(plain.list(_, wire.message_to_plain))
+  |> plain.list(wire.message_to_plain)
+  |> promise.resolve
 }
 
 pub fn send(
@@ -25,9 +26,6 @@ pub fn send(
   use name <- server.arg(name, decode.string)
   use body <- server.arg(body, decode.string)
   api.send(context, name:, body:)
-  |> promise.map(plain.result(
-    _,
-    wire.message_to_plain,
-    wire.chat_error_to_plain,
-  ))
+  |> plain.result(wire.message_to_plain, wire.chat_error_to_plain)
+  |> promise.resolve
 }

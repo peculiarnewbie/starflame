@@ -12,7 +12,6 @@ export default defineConfig({
       runWorkerFirst: ["/rpc", "/session", "/socket"],
     },
     env: {
-      DB: bindings.d1({ name: "starflame-chat" }),
       CHAT: bindings.durableObject({
         worker: "starflame-chat",
         exportName: "ChatRoom",

@@ -68,12 +68,11 @@ target tree. Composition (a `Board` target holding a `View` target) works but
 changes how disposal propagates. Minor, but it adds up in a capability tree
 with more than two nodes.
 
-## 5. D1 is doing the work of DO storage again
+## 5. DO storage — fixed
 
-Strokes are per-board and colocated with the capability, which is exactly what
-`ctx.storage.sql` is for. The runtime still has no bindings for it (the chat
-FINDINGS made the same point), so the example uses D1 and every stroke write
-leaves the object.
+Strokes are per-board and colocated with the capability. The example now uses
+`starflame/do_sql` over `ctx.storage.sql`, so a stroke write stays in the
+object (the chat FINDINGS carried the same gap).
 
 ## Verdict
 

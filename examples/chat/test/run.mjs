@@ -29,7 +29,6 @@ const options = convertV4MiniflareOptions({
   scriptPath: outfile,
   compatibilityDate: "2026-09-30",
   port: 8795,
-  d1Databases: ["DB"],
   durableObjects: {
     CHAT: { className: "ChatRoom", useSQLite: true },
   },

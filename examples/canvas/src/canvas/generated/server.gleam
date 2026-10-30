@@ -17,19 +17,18 @@ pub fn add_stroke(
 ) -> promise.Promise(plain.Plain) {
   use draft <- server.arg(draft, wire.stroke_draft_decoder())
   api.add_stroke(context, draft:)
-  |> promise.map(plain.result(
-    _,
-    wire.stroke_to_plain,
-    wire.canvas_error_to_plain,
-  ))
+  |> plain.result(wire.stroke_to_plain, wire.canvas_error_to_plain)
+  |> promise.resolve
 }
 
 pub fn clear(context: server.Context) -> promise.Promise(plain.Plain) {
   api.clear(context)
-  |> promise.map(plain.nil)
+  |> plain.nil
+  |> promise.resolve
 }
 
 pub fn snapshot(context: server.Context) -> promise.Promise(plain.Plain) {
   api.snapshot(context)
-  |> promise.map(plain.list(_, wire.stroke_to_plain))
+  |> plain.list(wire.stroke_to_plain)
+  |> promise.resolve
 }

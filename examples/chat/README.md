@@ -1,6 +1,6 @@
 # Chat example
 
-Rooms with history in D1 and live updates over a **hibernating** WebSocket.
+Rooms with history in the room's own SQLite and live updates over a **hibernating** WebSocket.
 
 ![Chat](screenshot-chat.png)
 
@@ -62,8 +62,8 @@ history order, room isolation, and recovery after a Worker restart.
 
 ## Limits
 
-- Messages live in D1, not DO SQLite: the runtime has no DO-storage bindings
-  yet. One row set per room, no pagination beyond the last 200 messages.
+- Messages live in the room's SQLite (`ctx.storage.sql`), so nothing leaves the object.
+  History is capped at the last 200 messages; there is no pagination.
 - Names are chosen by the client and not unique; the session id is the real
   identity.
 - No editing, deleting, typing indicators, or read receipts.

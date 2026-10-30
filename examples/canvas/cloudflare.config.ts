@@ -12,7 +12,6 @@ export default defineConfig({
       runWorkerFirst: ["/rpc", "/session"],
     },
     env: {
-      DB: bindings.d1({ name: "starflame-canvas" }),
       BOARD: bindings.durableObject({
         worker: "starflame-canvas",
         exportName: "CanvasBoard",

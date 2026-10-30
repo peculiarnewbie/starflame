@@ -1,16 +1,16 @@
 //// Every public function here is an RPC method.
 ////
 //// The caller's identity and room arrive in `auth`, bound by the Durable
-//// Object, so neither is an argument.
+//// Object, so neither is an argument. Storage is the object's own SQLite.
 
 import chat/shared.{
   type ChatError, type Message, Message, EmptyMessage, EmptyName, MessageTooLong,
   NameTooLong, max_body, max_name,
 }
 import gleam/dynamic/decode
-import gleam/javascript/promise.{type Promise}
+import gleam/list
 import gleam/string
-import starflame/d1
+import starflame/do_sql as sql
 import starflame/server
 
 const schema =
@@ -27,12 +27,12 @@ pub fn send(
   context: server.Context,
   name name: String,
   body body: String,
-) -> Promise(Result(Message, ChatError)) {
+) -> Result(Message, ChatError) {
   let #(author, room) = identity(context)
   let name = string.trim(name)
   let body = string.trim(body)
   case validate(name, body) {
-    Error(error) -> promise.resolve(Error(error))
+    Error(error) -> Error(error)
     Ok(#(name, body)) -> {
       let message =
         Message(
@@ -45,36 +45,36 @@ pub fn send(
         )
       use db <- with_db(context)
       use _ <-
-        or_reject(d1.run(
+        or_reject(sql.run(
           db,
           "INSERT INTO messages (id, room, author, name, body, created_at)
            VALUES (?, ?, ?, ?, ?, ?)",
           [
-            d1.string(message.id),
-            d1.string(message.room),
-            d1.string(message.author),
-            d1.string(message.name),
-            d1.string(message.body),
-            d1.int(message.created_at),
+            sql.string(message.id),
+            sql.string(message.room),
+            sql.string(message.author),
+            sql.string(message.name),
+            sql.string(message.body),
+            sql.int(message.created_at),
           ],
         ))
-      promise.resolve(Ok(message))
+      Ok(message)
     }
   }
 }
 
-pub fn history(context: server.Context) -> Promise(List(Message)) {
+pub fn history(context: server.Context) -> List(Message) {
   let #(_, room) = identity(context)
   use db <- with_db(context)
   use messages <-
-    or_reject(d1.all(
+    or_reject(sql.all(
       db,
       "SELECT id, room, author, name, body, created_at
        FROM messages WHERE room = ? ORDER BY created_at ASC LIMIT 200",
-      [d1.string(room)],
+      [sql.string(room)],
       message_decoder(),
     ))
-  promise.resolve(messages)
+  messages
 }
 
 fn validate(
@@ -106,28 +106,26 @@ fn identity_decoder() -> decode.Decoder(#(String, String)) {
   decode.success(#(player, room))
 }
 
-// DATABASE --------------------------------------------------------------------
+// STORAGE ---------------------------------------------------------------------
 
 fn with_db(
   context: server.Context,
-  next: fn(d1.Database) -> Promise(a),
-) -> Promise(a) {
-  let db = d1.database(context, "DB")
-  use setup <- promise.await(d1.setup(db, [schema]))
-  case setup {
+  next: fn(sql.Database) -> a,
+) -> a {
+  let db = sql.database(context)
+  case sql.setup(db, [schema]) {
     Ok(Nil) -> next(db)
-    Error(error) -> panic as d1.describe(error)
+    Error(error) -> panic as sql.describe(error)
   }
 }
 
 fn or_reject(
-  query: Promise(Result(a, d1.Error)),
-  next: fn(a) -> Promise(b),
-) -> Promise(b) {
-  use result <- promise.await(query)
-  case result {
+  query: Result(a, sql.Error),
+  next: fn(a) -> b,
+) -> b {
+  case query {
     Ok(value) -> next(value)
-    Error(error) -> panic as d1.describe(error)
+    Error(error) -> panic as sql.describe(error)
   }
 }
 
@@ -137,7 +135,7 @@ fn message_decoder() -> decode.Decoder(Message) {
   use author <- decode.field("author", decode.string)
   use name <- decode.field("name", decode.string)
   use body <- decode.field("body", decode.string)
-  use created_at <- decode.field("created_at", d1.int_decoder())
+  use created_at <- decode.field("created_at", decode.int)
   decode.success(Message(id:, room:, author:, name:, body:, created_at:))
 }
 
