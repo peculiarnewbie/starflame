@@ -12,6 +12,7 @@ lustre = ">= 5.0.0 and < 6.0.0"
 starflame = { path = "../../packages/starflame" }
 
 [dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
 starflame_rpc_kit = { path = "../../packages/rpc/kit" }
 
 [starflame]

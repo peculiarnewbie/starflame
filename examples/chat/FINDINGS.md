@@ -83,3 +83,21 @@ reconnect itself (backoff in `client_ffi.mjs`).
 If realtime is a core use case, the priority is clear: **a stateless push
 transport with codecs**, so apps don't hand-roll a second protocol, and a way to
 test eviction so hibernation stops being an article of faith.
+
+## 6. Live-state recovery is the client's job — and it was wrong here
+
+An earlier version started history and the socket together, then replaced the
+message list with the history response. A live message that arrived while
+history was in flight was erased, and a reconnect missed everything sent while
+the socket was down.
+
+The client now merges snapshots and events by id (`chat/messages.merge`) and
+refreshes history when a reconnect opens. Those three rules — merge, order,
+refresh on reconnect — are the same in every realtime app. The framework offers
+no snapshot revision, no "subscribed" boundary, and no reconnect hook, so each
+app rediscovers them.
+
+**Suggestion:** a documented recovery recipe (or a small helper) that pairs
+history with a subscription and defines what happens between them. A registry
+of listeners alone would not have caught this: the bug is ordering, not
+cleanup.

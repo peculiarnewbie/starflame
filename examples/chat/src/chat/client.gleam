@@ -3,6 +3,7 @@
 
 import chat/codecs
 import chat/generated/client as api
+import chat/messages
 import chat/shared.{
   type ChatError, type Message, type RoomEvent, EmptyMessage, EmptyName,
   MessageTooLong, MessagePosted, NameTooLong, Presence, max_body, max_name,
@@ -10,12 +11,11 @@ import chat/shared.{
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
-import gleam/javascript/promise
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import lustre
-import lustre/attribute.{attribute}
+import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element, none, text}
 import lustre/element/html
@@ -34,6 +34,7 @@ pub opaque type Model {
     messages: List(Message),
     online: Int,
     connected: Bool,
+    ever_connected: Bool,
     error: Option(String),
   )
 }
@@ -51,6 +52,7 @@ pub fn main() -> Nil {
       messages: [],
       online: 0,
       connected: False,
+      ever_connected: False,
       error: None,
     )
   let app = lustre.application(init, update, view)
@@ -129,40 +131,50 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
     Sent(Ok(Ok(message))) ->
       #(
-        Model(..model, draft: "", messages: add_message(model.messages, message)),
+        Model(..model, draft: "", messages: messages.merge(model.messages, [message])),
         effect.none(),
       )
     Sent(Ok(Error(error))) ->
       #(Model(..model, error: Some(chat_error_text(error))), effect.none())
     Sent(Error(error)) -> failed(model, error)
-    GotHistory(Ok(messages)) ->
-      #(Model(..model, messages: messages), effect.none())
+    GotHistory(Ok(history)) ->
+      #(
+        Model(..model, messages: messages.merge(model.messages, history)),
+        effect.none(),
+      )
     GotHistory(Error(error)) -> failed(model, error)
     SocketText(text) ->
       case decode_event(text) {
         Ok(MessagePosted(message)) ->
           #(
-            Model(..model, messages: add_message(model.messages, message)),
+            Model(
+              ..model,
+              messages: messages.merge(model.messages, [message]),
+            ),
             effect.none(),
           )
         Ok(Presence(online)) -> #(Model(..model, online: online), effect.none())
         Error(_) -> #(model, effect.none())
       }
-    SocketStatus(status) ->
-      #(Model(..model, connected: status == "open"), effect.none())
+    SocketStatus(status) -> {
+      let reconnected = model.ever_connected
+      let model =
+        Model(
+          ..model,
+          connected: status == "open",
+          ever_connected: model.ever_connected || status == "open",
+        )
+      case status == "open" && reconnected {
+        True -> #(model, load_history(model))
+        False -> #(model, effect.none())
+      }
+    }
     Dismissed -> #(Model(..model, error: None), effect.none())
   }
 }
 
 fn failed(model: Model, error: client.RpcError) -> #(Model, Effect(Msg)) {
   #(Model(..model, error: Some(rpc_error_text(error))), effect.none())
-}
-
-fn add_message(messages: List(Message), message: Message) -> List(Message) {
-  case list.any(messages, fn(existing) { existing.id == message.id }) {
-    True -> messages
-    False -> list.append(messages, [message])
-  }
 }
 
 fn decode_event(text: String) -> Result(RoomEvent, Nil) {
