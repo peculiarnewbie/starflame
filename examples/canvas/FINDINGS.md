@@ -3,37 +3,40 @@
 Notes from building a capability-based canvas. These are framework gaps, not
 bugs in the example.
 
-## 1. The RPC kit cannot express a method that returns a capability
+## 1. Capabilities are generated — but not where side effects are needed
 
-This is the headline. A capability is a live object passed by reference — an
-`RpcTarget`. The generated layer only knows data types: every return value is
-encoded with `plain`. So the central method of this app,
+**Correction:** an earlier version of this file claimed the kit could not
+express a capability. That was wrong. The kit has supported them for a while
+(`CapabilityT` in `model.gleam`, `SessionTarget` in `codegen.gleam`, typed
+client handles and `stub_decoder`); `examples/rpc` returns a `Session`
+capability with `me` and `rename`. A capability is a record whose fields are all
+functions, and it can be **returned** from an API method.
 
-```ts
-enter(readOnly: boolean) {
-  return { board: readOnly ? new BoardViewApi(...) : new BoardApi(...) };
-}
-```
+So the hand-written tree here was not forced by the client. What actually
+pushed this demo into TypeScript is narrower:
 
-cannot be written in Gleam or generated from an API module. It is hand-written
-TypeScript, and the generated client has no function for it.
+1. **A capability cannot be a field of another type.** The natural shape,
+   `enter() -> { board: Board }`, is rejected ("a capability ... can only be
+   returned", `model.gleam:412`). Returning the board directly works; returning
+   a read-only and an editor variant needs two methods (`enter`, `watch`).
+2. **Generated capability methods cannot be intercepted by the Durable
+   Object.** `add` has to broadcast a `StrokeAdded` event, but the generated
+   target calls the Gleam function directly; the DO only wraps the *root*
+   target. Without a runtime publish/subscribe registry, broadcasting has to
+   happen inside the API, where it has no access to the DO's listeners. That is
+   why this demo kept the capability tree in `room.ts`: to own the side effect.
+3. **Generated targets have no disposal hook** for application resources
+   (`codegen.gleam:1119`), so subscriptions tied to a capability still need
+   manual `[Symbol.dispose]` work in either design.
 
-The consequences:
+**Suggestion:** the missing piece is not a capability type; it is lifecycle.
+A `starflame/server` publish/subscribe registry, plus an API hook that runs when
+a capability target is disposed, would let capabilities be fully generated
+*and* broadcast correctly. The client side already has the typed handles.
 
-- `board_client.gleam` is a **hand-written** client: `client.call(root, "enter",
-  …, handles_decoder())` with `client.stub_decoder()` for the handle, then
-  `client.call(board, "add", …)` for each method.
-- The generated `api.gleam` is still useful — it owns validation and D1 — but it
-  is a backend the capability wrappers call, not the RPC surface the browser
-  sees.
-- Every capability app will repeat this: a TS target tree, a hand-written Gleam
-  client, and an API module used indirectly.
+The read-only shape remains the right pattern. It just does not need a bespoke
+client to be useful.
 
-**Suggestion:** a way to declare capabilities in the API module, for example a
-`Capability(...)` return type that the kit maps to `plain.unsafe_reference`, and
-generated client functions that keep the stub instead of decoding it. That would
-make the capability tree as typed as the data layer, and remove the second
-client.
 
 ## 2. Capability-shaped authorization is genuinely nicer
 
@@ -74,11 +77,11 @@ leaves the object.
 
 ## Verdict
 
-Capabilities are a strong fit for per-user permissions and live state, and this
-demo proves the model works end to end. The cost is that **the typed client
-stops at the capability boundary**: everything below `enter` is hand-written.
+Capabilities are a strong fit for per-user permissions and live state, and the
+model works end to end. The remaining friction is not the capability type —
+that is generated — it is the **lifecycle around it**: broadcasting from inside a
+capability method, disposing the resources a capability owns, and keeping the
+typed client when a capability has to be nested in a record.
 
-If capabilities are going to be a first-class part of the story, the kit needs a
-capability type. If they are an advanced escape hatch, the docs should show this
-exact pattern — hand-written tree, generated codecs for payloads — so the next
-person doesn't try to force it through `plain`.
+If capabilities are going to be a first-class part of the story, the runtime
+needs a publish/subscribe registry and a disposal hook, not another type.

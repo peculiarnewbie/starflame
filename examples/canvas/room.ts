@@ -102,7 +102,11 @@ class BoardViewApi extends RpcTarget {
     const retained = listener.dup();
     this.#listener = retained;
     this.#unlisten = this.#room.listen((event) => {
-      void Promise.resolve(retained(event)).catch(() => {});
+      void Promise.resolve(retained(event)).catch(() => {
+        // A callback that rejects is gone; release the capability's
+        // subscription instead of leaving a phantom subscriber.
+        this[Symbol.dispose]();
+      });
     });
     return Promise.resolve(undefined);
   }

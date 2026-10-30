@@ -34,10 +34,12 @@ that calling `add` on a read-only board throws.
 - **State:** D1, one row per stroke, points stored as JSON.
 - **Transport:** Cap'n Web over WebSocket (capabilities are passed by
   reference, so this can't use HTTP RPC).
-- **Client:** hand-written capability calls. The generated client cannot express
-  "this method returns a stub", so `src/canvas/board_client.gleam` calls
-  `client.call` directly and decodes the handle with `client.stub_decoder()`.
-  The payloads still use the generated codecs.
+- **Client:** hand-written capability calls. The kit can generate capabilities,
+  but this app needs `add` to broadcast to other subscribers, and generated
+  capability methods bypass the Durable Object, so the capability tree lives in
+  `room.ts` where it can publish. `src/canvas/board_client.gleam` calls
+  `client.call` directly; payloads still use the generated codecs.
+  See `FINDINGS.md` for the precise limits.
 - **Rendering:** `<canvas>` + pointer events; points are normalised to 0..1.
 
 ## Tests
