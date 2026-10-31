@@ -3,9 +3,10 @@
 //// The caller's identity and room arrive in `auth`, bound by the Durable
 //// Object, so neither is an argument. Storage is the object's own SQLite.
 
+import chat/events
 import chat/shared.{
-  type ChatError, type Message, Message, EmptyMessage, EmptyName, MessageTooLong,
-  NameTooLong, max_body, max_name,
+  type ChatError, type Message, EmptyMessage, EmptyName, Message, MessagePosted,
+  MessageTooLong, NameTooLong, max_body, max_name,
 }
 import gleam/dynamic/decode
 import gleam/list
@@ -44,8 +45,8 @@ pub fn send(
           created_at: now_ms(),
         )
       use db <- with_db(context)
-      use _ <-
-        or_reject(sql.run(
+      use _ <- or_reject(
+        sql.run(
           db,
           "INSERT INTO messages (id, room, author, name, body, created_at)
            VALUES (?, ?, ?, ?, ?, ?)",
@@ -57,7 +58,9 @@ pub fn send(
             sql.string(message.body),
             sql.int(message.created_at),
           ],
-        ))
+        ),
+      )
+      events.publish(context, MessagePosted(message))
       Ok(message)
     }
   }
@@ -66,14 +69,13 @@ pub fn send(
 pub fn history(context: server.Context) -> List(Message) {
   let #(_, room) = identity(context)
   use db <- with_db(context)
-  use messages <-
-    or_reject(sql.all(
-      db,
-      "SELECT id, room, author, name, body, created_at
+  use messages <- or_reject(sql.all(
+    db,
+    "SELECT id, room, author, name, body, created_at
        FROM messages WHERE room = ? ORDER BY created_at ASC LIMIT 200",
-      [sql.string(room)],
-      message_decoder(),
-    ))
+    [sql.string(room)],
+    message_decoder(),
+  ))
   messages
 }
 
@@ -108,10 +110,7 @@ fn identity_decoder() -> decode.Decoder(#(String, String)) {
 
 // STORAGE ---------------------------------------------------------------------
 
-fn with_db(
-  context: server.Context,
-  next: fn(sql.Database) -> a,
-) -> a {
+fn with_db(context: server.Context, next: fn(sql.Database) -> a) -> a {
   let db = sql.database(context)
   case sql.setup(db, [schema]) {
     Ok(Nil) -> next(db)
@@ -119,10 +118,7 @@ fn with_db(
   }
 }
 
-fn or_reject(
-  query: Result(a, sql.Error),
-  next: fn(a) -> b,
-) -> b {
+fn or_reject(query: Result(a, sql.Error), next: fn(a) -> b) -> b {
   case query {
     Ok(value) -> next(value)
     Error(error) -> panic as sql.describe(error)

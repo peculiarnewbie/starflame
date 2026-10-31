@@ -19,7 +19,7 @@ pub fn count_slowly(
   on_progress: dynamic.Dynamic,
 ) -> promise.Promise(plain.Plain) {
   use to <- server.arg(to, decode.int)
-  use on_progress <- server.callback(on_progress)
+  use on_progress <- server.callback_for(context, on_progress)
   api.count_slowly(context, to:, on_progress: fn(value_0) {
     on_progress([plain.int(value_0)])
   })

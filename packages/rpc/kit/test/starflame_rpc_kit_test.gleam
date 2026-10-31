@@ -386,6 +386,61 @@ pub fn edge_cases_compile_and_round_trip_test() {
 
 // CHECK -----------------------------------------------------------------------
 
+/// A server implementation, generated client, and application consumer must
+/// agree on one capability contract. Exercise the compiler, not just emitted text.
+pub fn capability_return_changes_fail_checking_test() {
+  let contract =
+    "import starflame/server.{type Context}
+
+pub type Board {
+  Board(clear: fn() -> Result(Nil, String))
+}
+
+pub fn enter(_context: Context) -> Board {
+  Board(clear: clear)
+}
+
+fn clear() { Ok(Nil) }
+"
+  let consumer =
+    "import gleam/javascript/promise.{type Promise}
+import spike/generated/client as rpc
+import starflame/client
+
+pub fn clear(board: rpc.Board) -> Promise(Result(Result(Nil, String), client.RpcError)) {
+  rpc.board_clear(board)
+}
+"
+  let root = project("capability-contract", [#("spike/api.gleam", contract)])
+  let assert Ok(_) = generate(root)
+  let assert Ok(_) =
+    simplifile.write(root <> "/src/spike/consumer.gleam", consumer)
+  let assert Ok(_) = shell(root, "gleam", ["check"])
+
+  // Reintroducing the original canvas bug must fail even before generation.
+  let assert Ok(_) =
+    simplifile.write(
+      root <> "/src/spike/api.gleam",
+      string.replace(contract, "fn clear() { Ok(Nil) }", "fn clear() { Nil }"),
+    )
+  let assert Error(implementation_error) = shell(root, "gleam", ["check"])
+  let assert True = string.contains(implementation_error, "Type mismatch")
+
+  // If the API intentionally changes too, stale generation is rejected.
+  let changed =
+    contract
+    |> string.replace("fn() -> Result(Nil, String)", "fn() -> Nil")
+    |> string.replace("fn clear() { Ok(Nil) }", "fn clear() { Nil }")
+  let assert Ok(_) = simplifile.write(root <> "/src/spike/api.gleam", changed)
+  let assert Error(stale) = starflame_rpc_kit.run(root, ["check"])
+  let assert True = string.contains(stale, "is out of date")
+
+  // After regeneration, the old application's expectation no longer compiles.
+  let assert Ok(_) = generate(root)
+  let assert Error(consumer_error) = shell(root, "gleam", ["check"])
+  let assert True = string.contains(consumer_error, "Type mismatch")
+}
+
 const small_api =
   "import gleam/javascript/promise.{type Promise}
 import spike/types.{type Item}
@@ -409,6 +464,16 @@ pub fn check_reports_stale_code_test() {
   let assert Ok(unchanged) = generate(root)
   let assert True =
     string.contains(unchanged, "Unchanged src/spike/generated/wire.gleam")
+
+  // Compiler formatter differences aren't contract changes.
+  let path = root <> "/src/spike/generated/wire.gleam"
+  let assert Ok(wire) = simplifile.read(path)
+  let assert Ok(_) =
+    simplifile.write(
+      path,
+      string.replace(wire, "pub const item_kind =", "pub const item_kind     ="),
+    )
+  let assert Ok(_) = starflame_rpc_kit.run(root, ["check"])
 
   // Adding a field breaks the generated code, which mustn't stop the kit.
   let assert Ok(_) =

@@ -64,5 +64,7 @@ Worker observability. The application creates its table on first use.
 
 `src/todos/generated/` comes from `src/todos/api.gleam`. `pnpm dev` regenerates
 it as the API changes, `pnpm build` fails if it's out of date, and `pnpm rpc`
-regenerates it by hand. `TodoRoom` in `room.ts` wraps the generated target to order
-writes and broadcast changes, and serves `subscribe` itself.
+regenerates it by hand. `TodoRoom` in `room.ts` serves that generated target
+directly. The Gleam API orders writes with `server.serialise`, and
+`todos/live.gleam` publishes typed changes to RPC subscribers and the Lustre
+server component. Generated target disposal releases subscriptions.

@@ -10,6 +10,7 @@ import notes/shared
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 
 pub opaque type Api {
   Api(stub: client.Stub)
@@ -49,7 +50,7 @@ pub fn add_note(
 ) -> promise.Promise(
   Result(Result(shared.Note, shared.NotesError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "add_note",
     [plain.string(body)],
@@ -67,7 +68,7 @@ pub fn delete_note(
   api: Api,
   id id: Int,
 ) -> promise.Promise(Result(Result(Nil, shared.NotesError), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "delete_note",
     [plain.int(id)],
@@ -87,7 +88,7 @@ pub fn list_notes(
 ) -> promise.Promise(
   Result(Result(List(shared.Note), shared.NotesError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "list_notes",
     [],
@@ -116,7 +117,7 @@ pub fn me(
 ) -> promise.Promise(
   Result(Result(shared.Me, shared.NotesError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "me",
     [],

@@ -7,6 +7,7 @@ The package targets JavaScript and exports:
 | --- | --- |
 | `starflame/client` | Typed RPC calls, callbacks, connection handling, and Lustre effects |
 | `starflame/server` | Request context, argument decoding, and callback forwarding |
+| `starflame/topic` | Typed events and subscriptions owned by server capabilities |
 | `starflame/plain` | Wire values and codecs for shared Gleam types |
 | `starflame/d1` | Cloudflare D1 bindings, setup, queries, and writes |
 | `starflame/do_sql` | Durable Object SQLite bindings (synchronous) |
@@ -31,3 +32,18 @@ Worker output. The package.json here is a private workspace build runner;
 
 [`starflame_rpc_kit`](../rpc/kit) generates the codecs, dispatchers and client
 functions that use this runtime.
+
+Application RPC calls use those generated functions. The API's Gleam types
+determine both the server encoder and client decoder; the compiler checks the
+implementation and every typed caller, and the kit's `check` rejects stale
+generation. Raw method names and caller-supplied decoders are available only
+through the explicitly unsafe `starflame/unsafe_rpc` module. The old
+`client.call`, `client.callback`, and `client.stub_decoder` primitives moved
+there; they do not provide the shared API guarantee.
+
+`server.with_dispose(capability, cleanup)` ties resources to a generated
+capability's lifetime. Generated targets retain callback stubs after a method
+returns and release them on disposal. Use `topic.Subscription(event)` for live
+events, and register `topic.dispose(subscription)` as the capability's cleanup.
+`server.serialise(context, operation)` orders asynchronous operations sharing
+an execution context, such as a Durable Object's state.

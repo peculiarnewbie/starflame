@@ -1,14 +1,12 @@
 //// The same todo UI running as a real Lustre server component.
 
-import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode
 import gleam/json
 import lustre
 import lustre/server_component
 import starflame/client.{type Stub} as _
 import todos/client
 import todos/generated/client as api
-import todos/generated/wire
+import todos/shared.{type Change}
 
 pub fn start(
   stub: Stub,
@@ -43,11 +41,8 @@ pub fn receive(runtime: lustre.Runtime(client.Msg), data: String) -> Bool {
   }
 }
 
-pub fn change(runtime: lustre.Runtime(client.Msg), data: Dynamic) -> Nil {
-  case decode.run(data, wire.change_decoder()) {
-    Ok(change) -> lustre.send(runtime, lustre.dispatch(client.Changed(change)))
-    Error(_) -> Nil
-  }
+pub fn change(runtime: lustre.Runtime(client.Msg), change: Change) -> Nil {
+  lustre.send(runtime, lustre.dispatch(client.Changed(change)))
 }
 
 pub fn stop(runtime: lustre.Runtime(client.Msg)) -> Nil {

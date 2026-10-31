@@ -57,7 +57,7 @@ pub fn subscribe(
   context: server.Context,
   on_change: dynamic.Dynamic,
 ) -> promise.Promise(plain.Plain) {
-  use on_change <- server.callback(on_change)
+  use on_change <- server.callback_for(context, on_change)
   api.subscribe(context, on_change: fn(value_0) {
     on_change([wire.change_to_plain(value_0)])
   })

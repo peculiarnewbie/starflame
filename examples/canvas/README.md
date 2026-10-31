@@ -19,13 +19,14 @@ the stroke immediately. **Watch only** re-enters with a read-only capability.
 ## How it is put together
 
 ```
-root.enter(read_only) ──▶ { board: BoardApi | BoardViewApi }
+root.enter() ──▶ Board (editor)
+root.watch() ──▶ BoardView (viewer)
 ```
 
 | Capability | Methods |
 | --- | --- |
-| `BoardApi` (editor) | `snapshot`, `add`, `clear`, `subscribe` |
-| `BoardViewApi` (viewer) | `snapshot`, `subscribe` |
+| `Board` (editor) | `snapshot`, `add`, `clear`, `subscribe` |
+| `BoardView` (viewer) | `snapshot`, `subscribe` |
 
 Read-only is not a flag checked per call: the viewer's object simply has no
 `add` or `clear`, so a call fails at the capability boundary. The tests assert
@@ -34,12 +35,11 @@ that calling `add` on a read-only board throws.
 - **State:** the room's SQLite, one row per stroke, points stored as JSON.
 - **Transport:** Cap'n Web over WebSocket (capabilities are passed by
   reference, so this can't use HTTP RPC).
-- **Client:** hand-written capability calls. The kit can generate capabilities,
-  but this app needs `add` to broadcast to other subscribers, and generated
-  capability methods bypass the Durable Object, so the capability tree lives in
-  `room.ts` where it can publish. `src/canvas/board_client.gleam` calls
-  `client.call` directly; payloads still use the generated codecs.
-  See `FINDINGS.md` for the precise limits.
+- **Contract:** `canvas/api.gleam` declares and implements the editor and viewer
+  capabilities. Both clients and dispatchers are generated; UI helpers declare
+  no independent RPC names or reply decoders.
+- **Events:** `starflame/topic` carries typed `BoardEvent` values. Generated
+  callbacks encode them, and generated target disposal closes subscriptions.
 - **Rendering:** `<canvas>` + pointer events; points are normalised to 0..1.
 
 ## Tests
@@ -48,11 +48,14 @@ that calling `add` on a read-only board throws.
 pnpm --filter @starflame/example-canvas test
 ```
 
-The Miniflare suite drives the capability tree with raw Cap'n Web: `enter`
+The Miniflare suite drives generated Gleam clients and raw Cap'n Web: `enter`
 returns a stub, the read-only capability refuses `add`, validation rejects empty
 strokes and unknown colours, strokes round-trip through the object's SQLite, `subscribe` receives
 live `StrokeAdded` and `Cleared` events plus presence, rooms are isolated, and
-strokes survive a restart.
+strokes survive a restart. It also checks typed Clear replies, generated event
+decoding, subscription replacement, and cleanup when capabilities are disposed.
+Compiler regression tests in the RPC kit reject incompatible implementations,
+stale generation, and callers expecting an old capability return type.
 
 ## Limits
 

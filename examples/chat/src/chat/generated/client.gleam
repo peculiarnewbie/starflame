@@ -10,6 +10,7 @@ import gleam/javascript/promise
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 
 pub opaque type Api {
   Api(stub: client.Stub)
@@ -46,7 +47,7 @@ pub fn dispose(api: Api) -> Nil {
 pub fn history(
   api: Api,
 ) -> promise.Promise(Result(List(shared.Message), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "history",
     [],
@@ -65,7 +66,7 @@ pub fn send(
 ) -> promise.Promise(
   Result(Result(shared.Message, shared.ChatError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "send",
     [plain.string(name), plain.string(body)],

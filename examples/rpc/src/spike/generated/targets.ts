@@ -10,10 +10,18 @@ import * as runtime from "../../../starflame/starflame/server.mjs";
 
 export class Api extends RpcTarget {
   #context: runtime.Context$;
+  #disposed = false;
 
   constructor(context: runtime.Context$) {
     super();
     this.#context = context;
+    runtime.retain_capability(context);
+  }
+
+  [Symbol.dispose]() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    runtime.release_capability(this.#context);
   }
 
   count_slowly(to: unknown, on_progress: unknown) {
@@ -47,10 +55,18 @@ export class Api extends RpcTarget {
 
 class SessionTarget extends RpcTarget {
   #session: unknown;
+  #disposed = false;
 
   constructor(session: unknown) {
     super();
     this.#session = session;
+    runtime.retain_capability(session);
+  }
+
+  [Symbol.dispose]() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    runtime.release_capability(this.#session);
   }
 
   me() {

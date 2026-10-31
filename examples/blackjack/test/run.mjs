@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import * as client from "../build/dev/javascript/blackjack/blackjack/generated/client.mjs";
 import * as shared from "../build/dev/javascript/blackjack/blackjack/shared.mjs";
+import { newWebSocketRpcSession } from "capnweb";
 
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 const outfile = `${root}/.test/worker.mjs`;
@@ -100,6 +101,17 @@ console.log("\n# Origin and routing");
 
   const session = await newSession();
   check("sessions are unguessable", /^[0-9a-f-]{36}$/.test(session), session);
+
+  const raw = newWebSocketRpcSession(`ws://${base.host}/rpc?table=t1&session=${session}`);
+  let hidden = false;
+  try {
+    await raw.all_views();
+  } catch {
+    hidden = true;
+  } finally {
+    raw[Symbol.dispose]();
+  }
+  check("the generated target exposes no all-player view helper", hidden);
 }
 
 console.log("\n# Seating");

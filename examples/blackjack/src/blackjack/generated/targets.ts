@@ -10,18 +10,22 @@ import * as runtime from "../../../starflame/starflame/server.mjs";
 
 export class Api extends RpcTarget {
   #context: runtime.Context$;
+  #disposed = false;
 
   constructor(context: runtime.Context$) {
     super();
     this.#context = context;
+    runtime.retain_capability(context);
+  }
+
+  [Symbol.dispose]() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    runtime.release_capability(this.#context);
   }
 
   act(action: unknown) {
     return server.act(this.#context, action);
-  }
-
-  all_views() {
-    return server.all_views(this.#context);
   }
 
   join(name: unknown) {

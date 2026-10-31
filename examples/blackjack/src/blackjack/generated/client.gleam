@@ -10,6 +10,7 @@ import gleam/javascript/promise
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 
 pub opaque type Api {
   Api(stub: client.Stub)
@@ -49,7 +50,7 @@ pub fn act(
 ) -> promise.Promise(
   Result(Result(shared.View, shared.GameError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "act",
     [wire.action_to_plain(action)],
@@ -63,39 +64,6 @@ pub fn act(
   )
 }
 
-/// Every player's view, for the Durable Object to fan out. The browser's RPC
-/// target doesn't expose this.
-pub fn all_views(
-  api: Api,
-) -> promise.Promise(Result(List(#(String, shared.View)), client.RpcError)) {
-  client.call(
-    api.stub,
-    "all_views",
-    [],
-    fast_decode.kind_decoder(
-      fast_decode.ListKind(
-        fast_decode.TupleKind([fast_decode.StringKind, wire.view_kind]),
-      ),
-      fast_decode.list(_, fn(tuple) {
-        {
-          let tuple = tuple
-          #(
-            fast_decode.get(tuple, "0"),
-            wire.view_from_plain(fast_decode.get(tuple, "1")),
-          )
-        }
-      }),
-      fn() {
-        decode.list({
-          use element_0 <- decode.field(0, decode.string)
-          use element_1 <- decode.field(1, wire.view_decoder())
-          decode.success(#(element_0, element_1))
-        })
-      },
-    ),
-  )
-}
-
 /// Takes a seat, or renames the player already seated in this session.
 pub fn join(
   api: Api,
@@ -103,7 +71,7 @@ pub fn join(
 ) -> promise.Promise(
   Result(Result(shared.View, shared.GameError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "join",
     [plain.string(name)],
@@ -121,19 +89,18 @@ pub fn join(
 pub fn refresh(
   api: Api,
 ) -> promise.Promise(Result(shared.View, client.RpcError)) {
-  client.call(api.stub, "refresh", [], wire.view_decoder())
+  unsafe_rpc.call(api.stub, "refresh", [], wire.view_decoder())
 }
 
-/// Sends the initial view. The Durable Object serves this method itself so it
-/// can follow it with every later view.
+/// Sends the initial view, then typed updates for this player only.
 pub fn subscribe(
   api: Api,
   on_view on_view: fn(shared.View) -> Nil,
 ) -> promise.Promise(Result(Nil, client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "subscribe",
-    [client.callback(decode.at([0], wire.view_decoder()), on_view)],
+    [unsafe_rpc.callback(decode.at([0], wire.view_decoder()), on_view)],
     plain.nil_decoder(),
   )
 }

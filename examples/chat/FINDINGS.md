@@ -20,6 +20,10 @@ The important part is that the push channel is still typed: envelopes are built
 from `chat/shared` and encoded by the generated codecs, and the client decodes
 with `room_event_decoder`. It is not a second, hand-written protocol.
 
+The earlier TypeScript `RoomApi` wrapper has been removed. The transport serves
+the generated target, and `chat/events.gleam` constructs and encodes every
+message and presence event using the shared Gleam declarations.
+
 **What the runtime could add:** a documented "stateless push" transport for
 hibernating sockets, or a Cap'n Web mode that re-establishes a session by
 replaying a subscribe call. Either would let an app keep one protocol for both

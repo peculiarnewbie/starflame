@@ -48,17 +48,17 @@ regenerate. The kit documents this; the fix is a compiler-level concern.
 
 With codecs in `src/blackjack/codecs.gleam` (not under the RPC output
 directory), `api.gleam` can import `store.gleam`, and `store` imports the
-codecs. Persistence now lives in Gleam, and `room.ts` no longer touches state:
-it serializes calls, binds identity, and fans out views.
+codecs. Persistence, serialization, and typed view fanout now live in Gleam.
+`room.ts` binds identity and serves the generated target directly.
 
 Before: `room.ts` sequenced load → call → save → broadcast and carried a
 state handle through `env`. After: the API owns D1 entirely; the Durable Object
 is a coordinator. This is the pattern the todo example should have shown.
 
-**Still manual:** `all_views()` remains an internal RPC method on the generated
-API (not exposed by the target) so the DO can fan out per-player payloads. A
-first-class subscription registry would remove that, but only if it also
-handles callback retention and disposal.
+The handwritten `TableApi` wrapper and its `all_views()` helper are removed.
+`blackjack/events.gleam` filters typed views per player, `server.serialise`
+orders asynchronous reads and writes, and generated targets own callback
+retention and subscription disposal.
 
 ### 3. No typed way to carry call scope
 
@@ -145,5 +145,5 @@ Two of the three real gaps are now closed in the framework:
 
 **Identifying the caller** is closed in this example, but not yet in the
 framework: the session pattern is sound, yet every app still has to write it,
-and the token handling is demo-grade. That is the one worth productizing next,
-along with the subscription registry that would remove `all_views`.
+and the token handling is demo-grade. The subscription registry and generated
+callback lifecycle now remove the old `all_views` workaround.

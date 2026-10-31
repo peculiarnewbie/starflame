@@ -42,6 +42,11 @@ pub type RoomEvent {
 The client decodes each frame with `room_event_decoder`, so a malformed or
 out-of-date event fails loudly instead of being silently ignored.
 
+The Durable Object serves the generated RPC target directly. `chat/api.gleam`
+publishes typed `MessagePosted` values, and `chat/events.gleam` encodes both
+message and presence frames. The TypeScript transport declares no RPC methods
+or independent event shapes.
+
 ## Hibernation
 
 - `ctx.acceptWebSocket(socket, [player])` and `socket.serializeAttachment({ player, name })`

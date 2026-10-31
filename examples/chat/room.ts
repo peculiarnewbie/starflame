@@ -1,25 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
 import { fromRequest } from "@starflame/runtime/session.ts";
-import { newWorkersRpcResponse, RpcTarget } from "capnweb";
+import { newWorkersRpcResponse } from "capnweb";
 import { newApi } from "./build/dev/javascript/chat/chat/generated/targets.ts";
+import { presence } from "./build/dev/javascript/chat/chat/events.mjs";
 
-type Reply<T> = { $: "Ok"; 0: T } | { $: "Error"; 0: unknown };
 type Identity = { player: string; room: string };
 
 // One chat room per Durable Object. Sockets are hibernating: the object keeps
 // no per-connection state in memory, only the attachment on each socket, so an
 // eviction between messages costs nothing.
 export class ChatRoom extends DurableObject<Env> {
-  #queue: Promise<unknown> = Promise.resolve();
-
   get roomName(): string {
     return this.ctx.id.name ?? "lobby";
-  }
-
-  run<T>(operation: () => Promise<T>): Promise<T> {
-    const pending = this.#queue.then(operation);
-    this.#queue = pending.catch(() => undefined);
-    return pending;
   }
 
   api(identity: Identity) {
@@ -34,7 +26,7 @@ export class ChatRoom extends DurableObject<Env> {
     if (new URL(request.url).pathname.endsWith("/socket")) {
       return this.open(request, identity);
     }
-    return newWorkersRpcResponse(request, new RoomApi(this, identity));
+    return newWorkersRpcResponse(request, this.api(identity));
   }
 
   // Hibernation API: the socket lives in the runtime, not in this object.
@@ -49,12 +41,11 @@ export class ChatRoom extends DurableObject<Env> {
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server, [identity.player]);
     server.serializeAttachment({ player: identity.player, name });
-    this.broadcast({ $: "Presence", online: this.online() });
+    this.broadcast(presence(this.online()));
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  broadcast(event: unknown) {
-    const payload = JSON.stringify(event);
+  broadcast(payload: string) {
     for (const socket of this.ctx.getWebSockets()) {
       try {
         socket.send(payload);
@@ -77,41 +68,10 @@ export class ChatRoom extends DurableObject<Env> {
   }
 
   webSocketClose(_socket: WebSocket) {
-    this.broadcast({ $: "Presence", online: this.online() });
+    this.broadcast(presence(this.online()));
   }
 
   webSocketError(_socket: WebSocket) {
-    this.broadcast({ $: "Presence", online: this.online() });
-  }
-}
-
-class RoomApi extends RpcTarget {
-  #room: ChatRoom;
-  #identity: Identity;
-
-  constructor(room: ChatRoom, identity: Identity) {
-    super();
-    this.#room = room;
-    this.#identity = identity;
-  }
-
-  send(name: string, body: string) {
-    return this.#room.run(async () => {
-      const api = this.#room.api(this.#identity);
-      const reply = (await api.send(name, body)) as Reply<Record<string, unknown>>;
-      if (reply.$ === "Ok") {
-        // The reply is already in wire form; wrapping it keeps the push
-        // channel on the same codecs the client decodes.
-        this.#room.broadcast({ $: "MessagePosted", message: reply[0] });
-      }
-      return reply;
-    });
-  }
-
-  history() {
-    return this.#room.run(async () => {
-      const api = this.#room.api(this.#identity);
-      return api.history();
-    });
+    this.broadcast(presence(this.online()));
   }
 }

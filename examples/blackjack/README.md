@@ -46,7 +46,8 @@ across a Worker restart, and table isolation.
 | Codecs | `src/blackjack/codecs.gleam` | Generated from `shared.gleam` by the RPC kit. |
 | Persistence | `src/blackjack/store.gleam` | The table as one JSON row in D1. |
 | Sessions | `@starflame/runtime/session.ts` | `issue()` mints a token; `fromRequest()` derives the player id. |
-| Table | `room.ts` | One Durable Object per table: identity, serialize, broadcast. |
+| Transport | `room.ts` | One Durable Object per table, serving the generated API. |
+| Live views | `src/blackjack/events.gleam` | Typed player-specific subscriptions and disposal. |
 | UI | `src/blackjack/client.gleam` | Lustre app. |
 
 The state codecs are generated, not written by hand:

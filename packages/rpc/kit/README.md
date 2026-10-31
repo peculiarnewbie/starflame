@@ -23,6 +23,30 @@ With [`@starflame/vite`](../../vite), the dev server runs `generate` when the
 API module or a module it imports changes, and production builds run `check`.
 The kit lists those modules in `build/starflame_rpc_kit/sources.json` for it.
 
+## Type guarantee
+
+The server API is the single source for method arguments, replies, callbacks,
+and capability methods. Generated dispatchers call the checked implementation;
+generated client functions expose those same types to application code.
+`check` rejects missing or stale generated code, including changed capability
+return types. Equivalent Gleam formatting is accepted across compiler versions.
+After regeneration, a caller expecting the old type fails Gleam checking.
+
+This guarantee applies to generated calls built against the same API. Handwritten
+RPC names, decoders, JavaScript assertions, and custom transport methods cannot
+establish that connection. The raw primitives live in `starflame/unsafe_rpc` for
+explicit interoperability; application clients should not use them.
+
+Generated capabilities support server-side effects directly in their Gleam
+functions. Use `starflame/topic` to publish typed events, and
+`server.with_dispose` to close a capability's subscriptions. Its received
+callback stubs remain alive until the generated target is disposed. Returning
+the same capability value through multiple targets keeps its resources alive
+until the last target releases it. Cleanup functions must be synchronous.
+
+Gleam checking concerns one build's types. Network failures and independently
+deployed client/server versions still need runtime decoding and error handling.
+
 ## Standalone state codecs
 
 Generate codecs for all public types defined in a module, without adding an

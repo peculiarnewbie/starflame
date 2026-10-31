@@ -8,6 +8,7 @@ import gleam/javascript/promise
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 import todos/generated/wire
 import todos/shared
 
@@ -49,7 +50,7 @@ pub fn add_todo(
 ) -> promise.Promise(
   Result(Result(shared.Todo, shared.TodoError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "add_todo",
     [plain.string(title)],
@@ -67,14 +68,14 @@ pub fn add_todo(
 pub fn clear_completed(
   api: Api,
 ) -> promise.Promise(Result(Int, client.RpcError)) {
-  client.call(api.stub, "clear_completed", [], decode.int)
+  unsafe_rpc.call(api.stub, "clear_completed", [], decode.int)
 }
 
 pub fn delete_todo(
   api: Api,
   id id: Int,
 ) -> promise.Promise(Result(Result(Nil, shared.TodoError), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "delete_todo",
     [plain.int(id)],
@@ -91,7 +92,7 @@ pub fn delete_todo(
 pub fn list_todos(
   api: Api,
 ) -> promise.Promise(Result(List(shared.Todo), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "list_todos",
     [],
@@ -110,7 +111,7 @@ pub fn set_done(
 ) -> promise.Promise(
   Result(Result(shared.Todo, shared.TodoError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "set_done",
     [plain.int(id), plain.bool(done)],
@@ -124,17 +125,15 @@ pub fn set_done(
   )
 }
 
-/// Sends `on_change` a snapshot of the list. The `TodoRoom` Durable Object
-/// in room.ts serves this method itself, so it can follow the snapshot with
-/// every later change.
+/// Sends a snapshot, then every committed change through a typed callback.
 pub fn subscribe(
   api: Api,
   on_change on_change: fn(shared.Change) -> Nil,
 ) -> promise.Promise(Result(Nil, client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "subscribe",
-    [client.callback(decode.at([0], wire.change_decoder()), on_change)],
+    [unsafe_rpc.callback(decode.at([0], wire.change_decoder()), on_change)],
     plain.nil_decoder(),
   )
 }
