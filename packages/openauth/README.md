@@ -27,6 +27,11 @@ pub fn auth() -> openauth.Auth(Me) {
 
 - `storage` is a KV binding, where OpenAuth keeps its signing keys and refresh
   tokens.
+  Expiring records keep their exact deadline in KV metadata. Reads and scans
+  enforce it even when KV must retain the record longer to satisfy its
+  [minimum cleanup TTL](https://developers.cloudflare.com/kv/api/write-key-value-pairs/#expiring-keys).
+  Existing OpenAuth key names and JSON values remain compatible; existing
+  records without this metadata use KV's own expiration.
 - `success` turns an `Identity` into the app's user, such as by finding or
   creating it in D1. If it returns an error, that error is shown on the
   sign-in page.
@@ -91,6 +96,7 @@ signs out.
     So requests for other clients or redirect URIs are refused before
     OpenAuth sees them.
 
-`pnpm test` runs a full sign-in in Miniflare: refreshing, signing out, the
+`pnpm test` checks KV expiry boundaries and legacy storage compatibility, then
+runs a full sign-in in Miniflare: refreshing, signing out, the
 lockout, parallel guessing, and the redirect checks. Google sign-in isn't
 tested end to end, because that needs Google.

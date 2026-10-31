@@ -12,7 +12,7 @@ import { GoogleOidcProvider } from "@openauthjs/openauth/provider/google";
 import { CodeProvider } from "@openauthjs/openauth/provider/code";
 import { CodeUI } from "@openauthjs/openauth/ui/code";
 import { Select } from "@openauthjs/openauth/ui/select";
-import { CloudflareStorage } from "@openauthjs/openauth/storage/cloudflare";
+import { createKVStorage } from "./starflame_openauth_kv.mjs";
 import { Result$Ok, Result$Error } from "./gleam.mjs";
 import { Option$Some, Option$None } from "../gleam_stdlib/gleam/option.mjs";
 import {
@@ -156,7 +156,7 @@ async function logout(auth, request, env) {
     // A refresh token is `<subject>:<id>`, stored under that subject.
     const parts = refresh.split(":");
     const id = parts.pop();
-    const storage = CloudflareStorage({ namespace: env[auth.storage] });
+    const storage = createKVStorage(env[auth.storage]);
     await storage.remove(["oauth:refresh", parts.join(":"), id]);
   }
   return redirect("/", clearTokens(request), 303);
@@ -227,7 +227,7 @@ function issuer(auth, env) {
   const created = createIssuer({
     // Only the client checks subjects, in `verify`.
     subjects: {},
-    storage: CloudflareStorage({ namespace: env[auth.storage] }),
+    storage: createKVStorage(env[auth.storage]),
     providers,
     theme: {
       title: auth.title,
