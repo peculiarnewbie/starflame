@@ -1,16 +1,25 @@
-// The Worker entrypoint: sessions, RPC, and serving objects straight from R2.
+// The Worker entrypoint: sessions, RPC, and serving objects from R2.
+// Mounted at /app/photos; requests are stripped to the app root.
 
 import { fromRequest, issue } from "@starflame/runtime/session.ts";
 import { newWorkersRpcResponse } from "capnweb";
 import { newApi } from "./build/dev/javascript/photos/photos/generated/targets.ts";
 
+const BASE = "/app/photos";
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
+    if (url.pathname === BASE) {
+      return Response.redirect(`${url.origin}${BASE}/`, 308);
+    }
+    const path = url.pathname.startsWith(`${BASE}/`)
+      ? url.pathname.slice(BASE.length)
+      : url.pathname;
 
-    if (url.pathname === "/session") return issue();
+    if (path === "/session") return issue();
 
-    if (url.pathname === "/rpc") {
+    if (path === "/rpc") {
       const origin = request.headers.get("Origin");
       if (origin !== null && origin !== url.origin) {
         return new Response("Forbidden origin", { status: 403 });
@@ -20,9 +29,8 @@ export default {
       return newWorkersRpcResponse(request, newApi(env, ctx, session.player));
     }
 
-    // Served from R2 directly, so images stream instead of crossing RPC.
-    if (url.pathname.startsWith("/photos/")) {
-      const id = decodeURIComponent(url.pathname.slice("/photos/".length));
+    if (path.startsWith("/photos/")) {
+      const id = decodeURIComponent(path.slice("/photos/".length));
       const object = await env.BUCKET.get(`photos/${id}`);
       if (!object) return new Response("Not found", { status: 404 });
       return new Response(object.body, {
@@ -34,6 +42,8 @@ export default {
       });
     }
 
-    return new Response("Not found", { status: 404 });
+    const asset = new URL(url);
+    asset.pathname = path;
+    return env.ASSETS.fetch(asset);
   },
 };

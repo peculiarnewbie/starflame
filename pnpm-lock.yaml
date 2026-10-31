@@ -311,6 +311,21 @@ importers:
         specifier: ^8.3.2
         version: 8.3.2(@types/node@24.19.1)(esbuild@0.28.2)
 
+  examples/landing:
+    devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: 2.0.0-beta.sha-52b0dc0e9
+        version: 2.0.0-beta.sha-52b0dc0e9(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2))(workerd@1.20261001.1)
+      cf:
+        specifier: 1.0.0-beta.10
+        version: 1.0.0-beta.10(@types/node@24.19.1)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.3.2
+        version: 8.3.2(@types/node@24.19.1)(esbuild@0.28.2)
+
   examples/notes:
     dependencies:
       '@openauthjs/openauth':

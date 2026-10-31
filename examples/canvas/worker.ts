@@ -1,16 +1,25 @@
-// The Worker entrypoint: sessions and the room's RPC target.
+// The Worker entrypoint: sessions and the board's RPC target.
+// Mounted at /app/canvas; requests are stripped to the app root.
 
 import { fromRequest, issue } from "@starflame/runtime/session.ts";
 
 export { CanvasBoard } from "./room.ts";
 
+const BASE = "/app/canvas";
+
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
+    if (url.pathname === BASE) {
+      return Response.redirect(`${url.origin}${BASE}/`, 308);
+    }
+    const path = url.pathname.startsWith(`${BASE}/`)
+      ? url.pathname.slice(BASE.length)
+      : url.pathname;
 
-    if (url.pathname === "/session") return issue();
+    if (path === "/session") return issue();
 
-    if (url.pathname === "/rpc") {
+    if (path === "/rpc") {
       const origin = request.headers.get("Origin");
       if (origin !== null && origin !== url.origin) {
         return new Response("Forbidden origin", { status: 403 });
@@ -22,7 +31,9 @@ export default {
       );
     }
 
-    return new Response("Not found", { status: 404 });
+    const asset = new URL(url);
+    asset.pathname = path;
+    return env.ASSETS.fetch(asset);
   },
 };
 

@@ -44,7 +44,9 @@ pub fn main() -> Nil {
   let name = get_item("chat:name")
   let model =
     Model(
-      api: api.connect_http("/rpc?room=" <> room <> "&session=" <> session_token()),
+      api: api.connect_http(
+        base_path() <> "/rpc?room=" <> room <> "&session=" <> session_token(),
+      ),
       room: room,
       name: name,
       name_input: name,
@@ -326,6 +328,9 @@ fn rpc_error_text(error: client.RpcError) -> String {
 
 @external(javascript, "./client_ffi.mjs", "session")
 fn session_token() -> String
+
+@external(javascript, "./client_ffi.mjs", "basePath")
+fn base_path() -> String
 
 @external(javascript, "./client_ffi.mjs", "roomName")
 fn room_name() -> String

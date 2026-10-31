@@ -1,6 +1,8 @@
-import { bindings, defineConfig } from "cf/config";
+import { bindings, defineConfig, triggers } from "cf/config";
 
-export default defineConfig({
+const BASE = "/app/photos";
+
+export default defineConfig(({ mode }) => ({
   worker: {
     name: "starflame-photos",
     compatibilityDate: "2026-09-30",
@@ -9,11 +11,21 @@ export default defineConfig({
     observability: { enabled: true },
     assets: {
       notFoundHandling: "single-page-application",
-      runWorkerFirst: ["/rpc", "/session", "/photos/*"],
+      runWorkerFirst:
+        mode === "development"
+          ? [`${BASE}/rpc`, `${BASE}/session`, `${BASE}/photos/*`]
+          : true,
     },
+    triggers: [
+      triggers.fetch({
+        pattern: "starflame.peculiarnewbie.com/app/photos/*",
+        zone: "peculiarnewbie.com",
+      }),
+    ],
     env: {
+      ASSETS: bindings.assets(),
       DB: bindings.d1({ name: "starflame-photos" }),
       BUCKET: bindings.r2({ name: "starflame-photos" }),
     },
   },
-});
+}));

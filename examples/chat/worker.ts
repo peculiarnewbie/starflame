@@ -1,29 +1,39 @@
 // The Worker entrypoint: sessions, HTTP RPC, and hibernating sockets.
+// Mounted at /app/chat; requests are stripped to the app root.
 
 import { fromRequest, issue } from "@starflame/runtime/session.ts";
-import { newWorkersRpcResponse } from "capnweb";
-import { newApi } from "./build/dev/javascript/chat/chat/generated/targets.ts";
 
 export { ChatRoom } from "./room.ts";
+
+const BASE = "/app/chat";
 
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
+    if (url.pathname === BASE) {
+      return Response.redirect(`${url.origin}${BASE}/`, 308);
+    }
+    const path = url.pathname.startsWith(`${BASE}/`)
+      ? url.pathname.slice(BASE.length)
+      : url.pathname;
 
-    if (url.pathname === "/session") return issue();
+    if (path === "/session") return issue();
 
-    if (url.pathname === "/rpc" || url.pathname === "/socket") {
+    if (path === "/rpc" || path === "/socket") {
       const origin = request.headers.get("Origin");
       if (origin !== null && origin !== url.origin) {
         return new Response("Forbidden origin", { status: 403 });
       }
       const session = await fromRequest(request);
       if (!session) return new Response("Missing session", { status: 401 });
-      const room = roomName(url.searchParams.get("room"));
-      return env.CHAT.getByName(room).fetch(request);
+      return env.CHAT.getByName(roomName(url.searchParams.get("room"))).fetch(
+        request,
+      );
     }
 
-    return new Response("Not found", { status: 404 });
+    const asset = new URL(url);
+    asset.pathname = path;
+    return env.ASSETS.fetch(asset);
   },
 };
 

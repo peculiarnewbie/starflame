@@ -66,7 +66,7 @@ pub fn main() -> Nil {
 fn connect(table: String) -> api.Api {
   api.connect(
     client.same_origin_url(
-      "/rpc?table=" <> table <> "&session=" <> session_token(),
+      base_path() <> "/rpc?table=" <> table <> "&session=" <> session_token(),
     ),
   )
 }
@@ -218,6 +218,9 @@ fn set_item(key: String, value: String) -> Nil
 
 @external(javascript, "./client_ffi.mjs", "session")
 fn session_token() -> String
+
+@external(javascript, "./client_ffi.mjs", "basePath")
+fn base_path() -> String
 
 @external(javascript, "./client_ffi.mjs", "tableName")
 fn table_name() -> String

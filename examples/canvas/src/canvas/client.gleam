@@ -36,7 +36,7 @@ pub fn main() -> Nil {
     Model(
       root: client.connect(
         client.same_origin_url(
-          "/rpc?room=" <> room_name() <> "&session=" <> session_token(),
+          base_path() <> "/rpc?room=" <> room_name() <> "&session=" <> session_token(),
         ),
       ),
       board: None,
@@ -296,6 +296,9 @@ fn rpc_error_text(error: client.RpcError) -> String {
 
 @external(javascript, "./client_ffi.mjs", "session")
 fn session_token() -> String
+
+@external(javascript, "./client_ffi.mjs", "basePath")
+fn base_path() -> String
 
 @external(javascript, "./client_ffi.mjs", "roomName")
 fn room_name() -> String

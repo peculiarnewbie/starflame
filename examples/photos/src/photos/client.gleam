@@ -47,11 +47,14 @@ pub fn main() -> Nil {
 }
 
 fn connect() -> api.Api {
-  api.connect_http("/rpc?session=" <> session_token())
+  api.connect_http(base_path() <> "/rpc?session=" <> session_token())
 }
 
 @external(javascript, "./client_ffi.mjs", "session")
 fn session_token() -> String
+
+@external(javascript, "./client_ffi.mjs", "basePath")
+fn base_path() -> String
 
 fn init(model: Model) -> #(Model, Effect(Msg)) {
   #(model, effect.batch([load_photos(model), load_me(model)]))
@@ -228,7 +231,7 @@ fn photo_card(model: Model, photo: Photo) -> Element(Msg) {
   html.figure([attribute.class("card")], [
     html.div([attribute.class("thumb")], [
       html.img([
-        attribute.src("/photos/" <> photo.id),
+        attribute.src(base_path() <> "/photos/" <> photo.id),
         attribute.alt(photo.name),
       ]),
     ]),

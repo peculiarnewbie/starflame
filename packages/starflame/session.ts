@@ -16,6 +16,12 @@ export interface Session {
 
 const PARAM = "session";
 
+/// "/app/<name>" when the app is mounted on a shared domain, else "".
+export function basePath(): string {
+  const parts = location.pathname.split("/").filter(Boolean);
+  return parts[0] === "app" && parts[1] ? `/app/${parts[1]}` : "";
+}
+
 /// `GET /session`: a fresh token, never cached.
 export function issue(): Response {
   return Response.json(
@@ -47,7 +53,7 @@ export async function browserSession(
 ): Promise<string> {
   const existing = localStorage.getItem(storageKey);
   if (existing) return existing;
-  const response = await fetch("/session");
+  const response = await fetch(`${basePath()}/session`);
   if (!response.ok) throw new Error(`Could not start a session (${response.status})`);
   const { session } = (await response.json()) as { session: string };
   localStorage.setItem(storageKey, session);

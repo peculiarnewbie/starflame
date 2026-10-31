@@ -1,4 +1,8 @@
 // The Worker entrypoint: sessions, and one Durable Object per table.
+//
+// The app is mounted at /app/blackjack on the shared domain. Requests are
+// stripped to the app's own root, assets are served through the assets binding,
+// and the workers.dev URL still works without the prefix.
 
 import { fromRequest, issue } from "@starflame/runtime/session.ts";
 import { newWorkersRpcResponse } from "capnweb";
@@ -6,13 +10,21 @@ import { newApi } from "./build/dev/javascript/blackjack/blackjack/generated/tar
 
 export { BlackjackTable } from "./room.ts";
 
+const BASE = "/app/blackjack";
+
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
+    if (url.pathname === BASE) {
+      return Response.redirect(`${url.origin}${BASE}/`, 308);
+    }
+    const path = url.pathname.startsWith(`${BASE}/`)
+      ? url.pathname.slice(BASE.length)
+      : url.pathname;
 
-    if (url.pathname === "/session") return issue();
+    if (path === "/session") return issue();
 
-    if (url.pathname === "/rpc") {
+    if (path === "/rpc") {
       // Cap'n Web doesn't check Origin, and browsers allow cross-site
       // WebSockets, so reject other sites here.
       const origin = request.headers.get("Origin");
@@ -26,7 +38,9 @@ export default {
       );
     }
 
-    return new Response("Not found", { status: 404 });
+    const asset = new URL(url);
+    asset.pathname = path;
+    return env.ASSETS.fetch(asset);
   },
 };
 

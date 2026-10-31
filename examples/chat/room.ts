@@ -31,7 +31,7 @@ export class ChatRoom extends DurableObject<Env> {
     if (!session) return new Response("Missing session", { status: 401 });
     const identity: Identity = { player: session.player, room: this.roomName };
 
-    if (new URL(request.url).pathname === "/socket") {
+    if (new URL(request.url).pathname.endsWith("/socket")) {
       return this.open(request, identity);
     }
     return newWorkersRpcResponse(request, new RoomApi(this, identity));

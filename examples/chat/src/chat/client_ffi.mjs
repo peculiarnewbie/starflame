@@ -16,8 +16,14 @@ export function setItem(key, value) {
   } catch {}
 }
 
-export function roomName() {
+export function basePath() {
   const parts = location.pathname.split("/").filter(Boolean);
+  return parts[0] === "app" && parts[1] ? `/app/${parts[1]}` : "";
+}
+
+export function roomName() {
+  const path = location.pathname.slice(basePath().length);
+  const parts = path.split("/").filter(Boolean);
   const raw = parts[0] === "r" && parts[1] ? decodeURIComponent(parts[1]) : "lobby";
   const cleaned = raw.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40);
   return cleaned.length > 0 ? cleaned : "lobby";
@@ -30,11 +36,9 @@ export function socketUrl(room, name) {
     name,
   });
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${location.host}/socket?${params}`;
+  return `${protocol}//${location.host}${basePath()}/socket?${params}`;
 }
 
-/// Opens the socket and reconnects with backoff. The server keeps no session
-/// state, so a reconnect only needs the URL.
 export function socket(url, onText, onStatus) {
   let socket;
   let stopped = false;

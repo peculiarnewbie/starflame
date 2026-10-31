@@ -24,6 +24,10 @@ data, so we can explore where application state should live.
 
 ## Examples
 
+All four demos are hosted at [starflame.peculiarnewbie.com](https://starflame.peculiarnewbie.com): blackjack, chat,
+canvas, and photos under `/app/<name>`. The todo demo is also still at its own
+URL.
+
 [Live todo demo](https://starflame-todo.peculiarnewbie.workers.dev) — one shared
 public list, three approaches:
 

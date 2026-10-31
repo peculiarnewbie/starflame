@@ -1,6 +1,8 @@
-import { bindings, defineConfig, exports } from "cf/config";
+import { bindings, defineConfig, exports, triggers } from "cf/config";
 
-export default defineConfig({
+const BASE = "/app/canvas";
+
+export default defineConfig(({ mode }) => ({
   worker: {
     name: "starflame-canvas",
     compatibilityDate: "2026-09-30",
@@ -9,9 +11,19 @@ export default defineConfig({
     observability: { enabled: true },
     assets: {
       notFoundHandling: "single-page-application",
-      runWorkerFirst: ["/rpc", "/session"],
+      runWorkerFirst:
+        mode === "development"
+          ? [`${BASE}/rpc`, `${BASE}/session`]
+          : true,
     },
+    triggers: [
+      triggers.fetch({
+        pattern: "starflame.peculiarnewbie.com/app/canvas/*",
+        zone: "peculiarnewbie.com",
+      }),
+    ],
     env: {
+      ASSETS: bindings.assets(),
       BOARD: bindings.durableObject({
         worker: "starflame-canvas",
         exportName: "CanvasBoard",
@@ -19,4 +31,4 @@ export default defineConfig({
     },
     exports: { CanvasBoard: exports.durableObject({ storage: "sqlite" }) },
   },
-});
+}));

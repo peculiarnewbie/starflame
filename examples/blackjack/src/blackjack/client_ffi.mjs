@@ -16,14 +16,19 @@ export function setItem(key, value) {
   }
 }
 
-// main.ts fetches a session before loading this module, so this is only a
-// fallback for a stale page.
 export function session() {
   return getItem(SESSION);
 }
 
-export function tableName() {
+/// "/app/blackjack" when mounted on the shared domain, "" on workers.dev.
+export function basePath() {
   const parts = location.pathname.split("/").filter(Boolean);
+  return parts[0] === "app" && parts[1] ? `/app/${parts[1]}` : "";
+}
+
+export function tableName() {
+  const path = location.pathname.slice(basePath().length);
+  const parts = path.split("/").filter(Boolean);
   const raw = parts[0] === "t" && parts[1] ? decodeURIComponent(parts[1]) : "lobby";
   return sanitise(raw);
 }
