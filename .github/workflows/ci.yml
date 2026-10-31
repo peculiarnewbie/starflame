@@ -17,11 +17,13 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: false
-          gleam-version: '1.18.1'
+          # 1.19 fingerprints all local dependencies in one pass, avoiding
+          # repeated dependency resolution on clean monorepo builds.
+          gleam-version: '1.19.2'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
+      - run: bash scripts/ci-retry-hex.sh pnpm build
+      - run: bash scripts/ci-retry-hex.sh pnpm typecheck
+      - run: bash scripts/ci-retry-hex.sh pnpm test
       - run: pnpm --filter @starflame/example-todo exec playwright install --with-deps chromium
       - name: Check todo routes and synchronization
         shell: bash
