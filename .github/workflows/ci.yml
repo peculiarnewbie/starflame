@@ -38,3 +38,29 @@ jobs:
           curl --fail --silent http://localhost:5173/ > /dev/null
           pnpm smoke
           pnpm test:compare
+  # The examples are path dependencies in this workspace and are edited
+  # alongside the framework. This job consumes the framework the way an app
+  # outside the repository would: by git, pinned to the commit under test.
+  external:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: false
+          gleam-version: '1.18.1'
+      - name: Build an app outside the repository
+        run: ./scripts/external-check.sh
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install the Vite plugin as an external dependency
+        shell: bash
+        run: |
+          dir="$(mktemp -d)"
+          cd "$dir"
+          printf '{"name":"vite-consumer","private":true,"type":"module"}\n' > package.json
+          pnpm add "file:$GITHUB_WORKSPACE/packages/vite"
+          node -e "import('@starflame/vite').then((m) => { if (typeof m.gleam !== 'function') process.exit(1) })"

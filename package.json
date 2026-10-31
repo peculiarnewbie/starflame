@@ -18,6 +18,7 @@
     "dev:photos": "pnpm --filter @starflame/example-photos dev",
     "dev:chat": "pnpm --filter @starflame/example-chat dev",
     "dev:canvas": "pnpm --filter @starflame/example-canvas dev",
-    "dev:landing": "pnpm --filter @starflame/example-landing dev"
+    "dev:landing": "pnpm --filter @starflame/example-landing dev",
+    "test:external": "./scripts/external-check.sh"
   }
 }
