@@ -5,12 +5,18 @@ import gleam/javascript/promise.{type Promise}
 import gleam/string
 import starflame/d1
 import starflame/server.{type Context}
+import todos/live
 import todos/shared.{
-  type Change, type Todo, type TodoError, EmptyTitle, NotFound, Snapshot,
-  TitleTooLong, Todo, max_title_length,
+  type Change, type Todo, type TodoError, CompletedCleared, EmptyTitle, NotFound,
+  Removed, Snapshot, TitleTooLong, Todo, Upsert, max_title_length,
 }
 
 pub fn list_todos(context: Context) -> Promise(List(Todo)) {
+  use <- server.serialise(context)
+  current_todos(context)
+}
+
+fn current_todos(context: Context) -> Promise(List(Todo)) {
   use db <- with_db(context)
   use todos <- or_reject(d1.all(
     db,
@@ -25,6 +31,7 @@ pub fn add_todo(
   context: Context,
   title title: String,
 ) -> Promise(Result(Todo, TodoError)) {
+  use <- server.serialise(context)
   let title = string.trim(title)
   case string.length(title) {
     0 -> promise.resolve(Error(EmptyTitle))
@@ -38,7 +45,7 @@ pub fn add_todo(
         [d1.string(title)],
         todo_decoder(),
       ))
-      single(todos, 0)
+      changed(context, single(todos, 0))
     }
   }
 }
@@ -48,6 +55,7 @@ pub fn set_done(
   id id: Int,
   done done: Bool,
 ) -> Promise(Result(Todo, TodoError)) {
+  use <- server.serialise(context)
   use db <- with_db(context)
   use todos <- or_reject(d1.all(
     db,
@@ -55,13 +63,14 @@ pub fn set_done(
     [d1.bool(done), d1.int(id)],
     todo_decoder(),
   ))
-  single(todos, id)
+  changed(context, single(todos, id))
 }
 
 pub fn delete_todo(
   context: Context,
   id id: Int,
 ) -> Promise(Result(Nil, TodoError)) {
+  use <- server.serialise(context)
   use db <- with_db(context)
   use changes <- or_reject(
     d1.run(db, "DELETE FROM todos WHERE id = ?", [
@@ -70,25 +79,38 @@ pub fn delete_todo(
   )
   case changes {
     0 -> Error(NotFound(id))
-    _ -> Ok(Nil)
+    _ -> {
+      live.publish(context, Removed(id))
+      Ok(Nil)
+    }
   }
 }
 
 /// Returns how many todos were removed.
 pub fn clear_completed(context: Context) -> Promise(Int) {
+  use <- server.serialise(context)
   use db <- with_db(context)
   use changes <- or_reject(d1.run(db, "DELETE FROM todos WHERE done = 1", []))
+  live.publish(context, CompletedCleared)
   changes
 }
 
-/// Sends `on_change` a snapshot of the list. The `TodoRoom` Durable Object
-/// in room.ts serves this method itself, so it can follow the snapshot with
-/// every later change.
+fn changed(context: Context, reply: Result(Todo, TodoError)) {
+  case reply {
+    Ok(item) -> live.publish(context, Upsert(item))
+    Error(_) -> Nil
+  }
+  reply
+}
+
+/// Sends a snapshot, then every committed change through a typed callback.
 pub fn subscribe(
   context: Context,
   on_change on_change: fn(Change) -> Nil,
 ) -> Promise(Nil) {
-  use todos <- promise.map(list_todos(context))
+  use <- server.serialise(context)
+  use todos <- promise.map(current_todos(context))
+  live.subscribe(context, on_change)
   on_change(Snapshot(todos))
 }
 

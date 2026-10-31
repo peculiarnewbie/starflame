@@ -10,6 +10,7 @@ import gleam/javascript/promise
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 
 pub opaque type Api {
   Api(stub: client.Stub)
@@ -43,16 +44,51 @@ pub fn dispose(api: Api) -> Nil {
   client.dispose(api.stub)
 }
 
-pub fn add_stroke(
-  api: Api,
-  draft draft: shared.StrokeDraft,
+/// Enters as an editor. Each capability owns its subscription.
+pub fn enter(api: Api) -> promise.Promise(Result(Board, client.RpcError)) {
+  unsafe_rpc.call(api.stub, "enter", [], board_decoder())
+}
+
+/// Enters as a viewer. There are no editing methods on this capability.
+pub fn watch(api: Api) -> promise.Promise(Result(BoardView, client.RpcError)) {
+  unsafe_rpc.call(api.stub, "watch", [], board_view_decoder())
+}
+
+// Board -----------------------------------------------------------------------
+
+pub opaque type Board {
+  Board(stub: client.Stub)
+}
+
+fn board_decoder() -> decode.Decoder(Board) {
+  unsafe_rpc.stub_decoder() |> decode.map(Board)
+}
+
+pub fn board_snapshot(
+  board: Board,
+) -> promise.Promise(Result(List(shared.Stroke), client.RpcError)) {
+  unsafe_rpc.call(
+    board.stub,
+    "snapshot",
+    [],
+    fast_decode.kind_decoder(
+      fast_decode.ListKind(wire.stroke_kind),
+      fast_decode.list(_, wire.stroke_from_plain),
+      fn() { decode.list(wire.stroke_decoder()) },
+    ),
+  )
+}
+
+pub fn board_add(
+  board: Board,
+  arg_1: shared.StrokeDraft,
 ) -> promise.Promise(
   Result(Result(shared.Stroke, shared.CanvasError), client.RpcError),
 ) {
-  client.call(
-    api.stub,
-    "add_stroke",
-    [wire.stroke_draft_to_plain(draft)],
+  unsafe_rpc.call(
+    board.stub,
+    "add",
+    [wire.stroke_draft_to_plain(arg_1)],
     fast_decode.kind_decoder(
       fast_decode.ResultKind(wire.stroke_kind, wire.canvas_error_kind),
       fast_decode.result(
@@ -67,11 +103,11 @@ pub fn add_stroke(
   )
 }
 
-pub fn clear(
-  api: Api,
+pub fn board_clear(
+  board: Board,
 ) -> promise.Promise(Result(Result(Nil, shared.CanvasError), client.RpcError)) {
-  client.call(
-    api.stub,
+  unsafe_rpc.call(
+    board.stub,
     "clear",
     [],
     fast_decode.kind_decoder(
@@ -84,11 +120,38 @@ pub fn clear(
   )
 }
 
-pub fn snapshot(
-  api: Api,
+pub fn board_subscribe(
+  board: Board,
+  arg_1: fn(shared.BoardEvent) -> Nil,
+) -> promise.Promise(Result(Nil, client.RpcError)) {
+  unsafe_rpc.call(
+    board.stub,
+    "subscribe",
+    [unsafe_rpc.callback(decode.at([0], wire.board_event_decoder()), arg_1)],
+    plain.nil_decoder(),
+  )
+}
+
+/// Releases the capability on the server.
+pub fn board_dispose(board: Board) -> Nil {
+  client.dispose(board.stub)
+}
+
+// BoardView -------------------------------------------------------------------
+
+pub opaque type BoardView {
+  BoardView(stub: client.Stub)
+}
+
+fn board_view_decoder() -> decode.Decoder(BoardView) {
+  unsafe_rpc.stub_decoder() |> decode.map(BoardView)
+}
+
+pub fn board_view_snapshot(
+  board_view: BoardView,
 ) -> promise.Promise(Result(List(shared.Stroke), client.RpcError)) {
-  client.call(
-    api.stub,
+  unsafe_rpc.call(
+    board_view.stub,
     "snapshot",
     [],
     fast_decode.kind_decoder(
@@ -97,4 +160,21 @@ pub fn snapshot(
       fn() { decode.list(wire.stroke_decoder()) },
     ),
   )
+}
+
+pub fn board_view_subscribe(
+  board_view: BoardView,
+  arg_1: fn(shared.BoardEvent) -> Nil,
+) -> promise.Promise(Result(Nil, client.RpcError)) {
+  unsafe_rpc.call(
+    board_view.stub,
+    "subscribe",
+    [unsafe_rpc.callback(decode.at([0], wire.board_event_decoder()), arg_1)],
+    plain.nil_decoder(),
+  )
+}
+
+/// Releases the capability on the server.
+pub fn board_view_dispose(board_view: BoardView) -> Nil {
+  client.dispose(board_view.stub)
 }

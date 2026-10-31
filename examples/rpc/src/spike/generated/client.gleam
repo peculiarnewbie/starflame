@@ -11,6 +11,7 @@ import spike/shared
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 
 pub opaque type Api {
   Api(stub: client.Stub)
@@ -50,10 +51,13 @@ pub fn count_slowly(
   to to: Int,
   on_progress on_progress: fn(Int) -> Nil,
 ) -> promise.Promise(Result(Int, client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "count_slowly",
-    [plain.int(to), client.callback(decode.at([0], decode.int), on_progress)],
+    [
+      plain.int(to),
+      unsafe_rpc.callback(decode.at([0], decode.int), on_progress),
+    ],
     decode.int,
   )
 }
@@ -62,14 +66,14 @@ pub fn crash(
   api: Api,
   reason reason: String,
 ) -> promise.Promise(Result(Int, client.RpcError)) {
-  client.call(api.stub, "crash", [plain.string(reason)], decode.int)
+  unsafe_rpc.call(api.stub, "crash", [plain.string(reason)], decode.int)
 }
 
 pub fn echo_everything(
   api: Api,
   everything everything: shared.Everything,
 ) -> promise.Promise(Result(shared.Everything, client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "echo_everything",
     [wire.everything_to_plain(everything)],
@@ -83,7 +87,7 @@ pub fn get_user(
 ) -> promise.Promise(
   Result(Result(shared.User, shared.ApiError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "get_user",
     [plain.int(id)],
@@ -101,7 +105,7 @@ pub fn list_users(
   api: Api,
   role role: option.Option(shared.Role),
 ) -> promise.Promise(Result(List(shared.User), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "list_users",
     [plain.option(role, wire.role_to_plain)],
@@ -117,7 +121,7 @@ pub fn login(
   api: Api,
   name name: String,
 ) -> promise.Promise(Result(Result(Session, shared.ApiError), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "login",
     [plain.string(name)],
@@ -130,7 +134,7 @@ pub fn login(
 pub fn whoami(
   api: Api,
 ) -> promise.Promise(Result(Result(String, shared.ApiError), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "whoami",
     [],
@@ -149,13 +153,13 @@ pub opaque type Session {
 }
 
 fn session_decoder() -> decode.Decoder(Session) {
-  client.stub_decoder() |> decode.map(Session)
+  unsafe_rpc.stub_decoder() |> decode.map(Session)
 }
 
 pub fn session_me(
   session: Session,
 ) -> promise.Promise(Result(shared.User, client.RpcError)) {
-  client.call(session.stub, "me", [], wire.user_decoder())
+  unsafe_rpc.call(session.stub, "me", [], wire.user_decoder())
 }
 
 pub fn session_rename(
@@ -164,7 +168,7 @@ pub fn session_rename(
 ) -> promise.Promise(
   Result(Result(shared.User, shared.ApiError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     session.stub,
     "rename",
     [plain.string(arg_1)],

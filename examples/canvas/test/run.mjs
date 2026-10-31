@@ -1,5 +1,5 @@
 // Bundles worker.ts, runs it in Miniflare, and drives the capability tree with
-// raw Cap'n Web. Usage: pnpm test.
+// generated clients and raw Cap'n Web. Usage: pnpm test.
 
 import assert from "node:assert/strict";
 import { build } from "esbuild";
@@ -80,12 +80,10 @@ console.log("\n# Capabilities");
 let adaBoard;
 let bobBoard;
 {
-  const handles = await ada.enter(false);
-  adaBoard = handles.board;
+  adaBoard = await ada.enter();
   check("enter returns a board capability", adaBoard !== undefined);
 
-  const viewHandles = await ada.enter(true);
-  const view = viewHandles.board;
+  const view = await ada.watch();
   check("a read-only capability can still read", Array.isArray(arr(await view.snapshot())));
   let rejected = false;
   try {
@@ -94,9 +92,15 @@ let bobBoard;
     rejected = true;
   }
   check("a read-only capability has no add method", rejected);
+  rejected = false;
+  try {
+    await view.clear();
+  } catch {
+    rejected = true;
+  }
+  check("a read-only capability has no clear method", rejected);
 
-  const bobHandles = await bob.enter(false);
-  bobBoard = bobHandles.board;
+  bobBoard = await bob.enter();
   check("another session gets its own capability", bobBoard !== undefined && bobBoard !== adaBoard);
 }
 
@@ -141,10 +145,56 @@ console.log("\n# Room isolation");
 {
   const otherToken = await newSession();
   const other = await connect("other", otherToken);
-  const otherBoard = (await other.enter(false)).board;
+  const otherBoard = await other.enter();
   check("another room starts empty", arr(await otherBoard.snapshot()).length === 0);
   await otherBoard.add(draft());
   check("rooms don't leak", arr(await adaBoard.snapshot()).length === 0);
+}
+
+console.log("\n# Generated client and capability disposal");
+{
+  const rpc = await import(
+    `${root}/build/dev/javascript/canvas/canvas/generated/client.mjs`
+  );
+  const shared = await import(`${root}/build/dev/javascript/canvas/canvas/shared.mjs`);
+  const api = rpc.connect(`${wsBase}/rpc?room=typed&session=${adaToken}`);
+  const editorReply = await rpc.enter(api);
+  assert.equal(editorReply.isOk(), true);
+  const editor = editorReply[0];
+  const viewReply = await rpc.watch(api);
+  assert.equal(viewReply.isOk(), true);
+  const viewer = viewReply[0];
+  const events = [];
+  const subscribed = await rpc.board_subscribe(editor, (event) => events.push(event));
+  check("generated callback subscriptions decode their replies", subscribed.isOk());
+  await rpc.board_view_subscribe(viewer, () => {});
+  await tick();
+  check("generated callbacks decode presence", events.some((event) => event.online === 2));
+
+  const cleared = await rpc.board_clear(editor);
+  check("the generated Gleam client decodes Clear", cleared.isOk() && cleared[0].isOk());
+  await tick();
+  check("the generated Gleam client decodes clear events", events.some(shared.BoardEvent$isCleared));
+
+  rpc.board_view_dispose(viewer);
+  await tick();
+  check("disposing a generated viewer removes its subscription", events.at(-1)?.online === 1);
+
+  // Calling subscribe again replaces its callback and keeps one subscriber.
+  const replaced = [];
+  await rpc.board_subscribe(editor, (event) => replaced.push(event));
+  const observerApi = await connect("typed", bobToken);
+  const observer = await observerApi.watch();
+  const counts = [];
+  await observer.subscribe((event) => counts.push(event));
+  await tick();
+  check("resubscribing keeps one subscription", replaced.at(-1)?.online === 2);
+  rpc.board_dispose(editor);
+  rpc.dispose(api);
+  await tick();
+  check("disposing the editor updates the other session's presence", counts.at(-1)?.online === 1);
+  observer[Symbol.dispose]();
+  observerApi[Symbol.dispose]();
 }
 
 console.log("\n# Restart");
@@ -157,7 +207,7 @@ console.log("\n# Restart");
 
   const token = await newSession();
   const fresh = await connect("board", token);
-  const board = (await fresh.enter(false)).board;
+  const board = await fresh.enter();
   const after = arr(await board.snapshot()).length;
   check("strokes survive a restart", after === before, `${after}/${before}`);
   const added = await board.add(draft());

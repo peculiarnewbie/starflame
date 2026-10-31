@@ -1,11 +1,12 @@
-//// Every public function here is an RPC method, except `all_views`, which the
-//// Durable Object uses to fan out one view per player.
+//// Every public function here is an RPC method. Events and mutations share
+//// the same Gleam types as the generated client.
 ////
 //// Identity and table scope come from `server.auth`, bound by the Durable
 //// Object to the caller's session. No method takes a player id or a table
 //// name, so a client cannot act as another player or against another table.
 
 import blackjack/engine
+import blackjack/events
 import blackjack/shared as s
 import blackjack/store
 import blackjack/view as views
@@ -18,12 +19,14 @@ pub fn join(
   context: Context,
   name name: String,
 ) -> Promise(Result(s.View, s.GameError)) {
+  use <- server.serialise(context)
   let #(player, table) = identity(context)
   use state <- promise.await(store.load(context, table))
   case engine.seat(state, player, name) {
     Error(error) -> promise.resolve(Error(error))
     Ok(state) -> {
       use _ <- promise.await(store.save(context, table, state))
+      events.publish(context, views.all(state))
       promise.resolve(Ok(views.of(state, player)))
     }
   }
@@ -33,12 +36,14 @@ pub fn act(
   context: Context,
   action action: s.Action,
 ) -> Promise(Result(s.View, s.GameError)) {
+  use <- server.serialise(context)
   let #(player, table) = identity(context)
   use state <- promise.await(store.load(context, table))
   case engine.process(state, player, action) {
     Error(error) -> promise.resolve(Error(error))
     Ok(state) -> {
       use _ <- promise.await(store.save(context, table, state))
+      events.publish(context, views.all(state))
       promise.resolve(Ok(views.of(state, player)))
     }
   }
@@ -46,34 +51,32 @@ pub fn act(
 
 /// The caller's current view of the table.
 pub fn refresh(context: Context) -> Promise(s.View) {
+  use <- server.serialise(context)
+  current_view(context)
+}
+
+fn current_view(context: Context) -> Promise(s.View) {
   let #(player, table) = identity(context)
   use state <- promise.await(store.load(context, table))
   promise.resolve(views.of(state, player))
 }
 
-/// Sends the initial view. The Durable Object serves this method itself so it
-/// can follow it with every later view.
+/// Sends the initial view, then typed updates for this player only.
 pub fn subscribe(
   context: Context,
   on_view on_view: fn(s.View) -> Nil,
 ) -> Promise(Nil) {
-  use view <- promise.map(refresh(context))
+  use <- server.serialise(context)
+  use view <- promise.map(current_view(context))
+  let #(player, _) = identity(context)
+  events.subscribe(context, player, on_view)
   on_view(view)
-}
-
-/// Every player's view, for the Durable Object to fan out. The browser's RPC
-/// target doesn't expose this.
-pub fn all_views(context: Context) -> Promise(List(#(String, s.View))) {
-  let #(_, table) = identity(context)
-  use state <- promise.await(store.load(context, table))
-  promise.resolve(views.all(state))
 }
 
 fn identity(context: Context) -> #(String, String) {
   case decode.run(server.auth(context), identity_decoder()) {
     Ok(identity) -> identity
-    Error(_) ->
-      panic as "The Worker must pass {player, table} as auth."
+    Error(_) -> panic as "The Worker must pass {player, table} as auth."
   }
 }
 

@@ -10,23 +10,93 @@ import * as runtime from "../../../starflame/starflame/server.mjs";
 
 export class Api extends RpcTarget {
   #context: runtime.Context$;
+  #disposed = false;
 
   constructor(context: runtime.Context$) {
     super();
     this.#context = context;
+    runtime.retain_capability(context);
   }
 
-  add_stroke(draft: unknown) {
-    return server.add_stroke(this.#context, draft);
+  [Symbol.dispose]() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    runtime.release_capability(this.#context);
   }
 
-  clear() {
-    return server.clear(this.#context);
+  enter() {
+    return server.enter(this.#context);
+  }
+
+  watch() {
+    return server.watch(this.#context);
+  }
+}
+
+class BoardTarget extends RpcTarget {
+  #board: unknown;
+  #disposed = false;
+
+  constructor(board: unknown) {
+    super();
+    this.#board = board;
+    runtime.retain_capability(board);
+  }
+
+  [Symbol.dispose]() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    runtime.release_capability(this.#board);
   }
 
   snapshot() {
-    return server.snapshot(this.#context);
+    return server.board_snapshot(this.#board as never);
   }
+
+  add(arg_1: unknown) {
+    return server.board_add(this.#board as never, arg_1);
+  }
+
+  clear() {
+    return server.board_clear(this.#board as never);
+  }
+
+  subscribe(arg_1: unknown) {
+    return server.board_subscribe(this.#board as never, arg_1);
+  }
+}
+
+export function newBoardTarget(board: unknown) {
+  return new BoardTarget(board);
+}
+
+class BoardViewTarget extends RpcTarget {
+  #board_view: unknown;
+  #disposed = false;
+
+  constructor(board_view: unknown) {
+    super();
+    this.#board_view = board_view;
+    runtime.retain_capability(board_view);
+  }
+
+  [Symbol.dispose]() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    runtime.release_capability(this.#board_view);
+  }
+
+  snapshot() {
+    return server.board_view_snapshot(this.#board_view as never);
+  }
+
+  subscribe(arg_1: unknown) {
+    return server.board_view_subscribe(this.#board_view as never, arg_1);
+  }
+}
+
+export function newBoardViewTarget(board_view: unknown) {
+  return new BoardViewTarget(board_view);
 }
 
 /**

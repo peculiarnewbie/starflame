@@ -21,15 +21,6 @@ pub fn act(
   |> promise.map(plain.result(_, wire.view_to_plain, wire.game_error_to_plain))
 }
 
-pub fn all_views(context: server.Context) -> promise.Promise(plain.Plain) {
-  api.all_views(context)
-  |> promise.map(
-    plain.list(_, fn(tuple) {
-      plain.array([plain.string(tuple.0), wire.view_to_plain(tuple.1)])
-    }),
-  )
-}
-
 pub fn join(
   context: server.Context,
   name: dynamic.Dynamic,
@@ -48,7 +39,7 @@ pub fn subscribe(
   context: server.Context,
   on_view: dynamic.Dynamic,
 ) -> promise.Promise(plain.Plain) {
-  use on_view <- server.callback(on_view)
+  use on_view <- server.callback_for(context, on_view)
   api.subscribe(context, on_view: fn(value_0) {
     on_view([wire.view_to_plain(value_0)])
   })

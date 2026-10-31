@@ -1,6 +1,7 @@
 //// The browser: a canvas plus a live board capability.
 
 import canvas/board_client
+import canvas/generated/client as rpc
 import canvas/shared.{
   type BoardEvent, type CanvasError, type Stroke, type StrokeDraft, BadColor,
   BadWidth, Cleared, EmptyStroke, Presence, StrokeAdded, TooManyPoints,
@@ -21,7 +22,7 @@ import starflame/client
 
 pub opaque type Model {
   Model(
-    root: client.Stub,
+    root: rpc.Api,
     board: Option(board_client.Board),
     read_only: Bool,
     strokes: List(Stroke),
@@ -34,7 +35,7 @@ pub opaque type Model {
 pub fn main() -> Nil {
   let model =
     Model(
-      root: client.connect(
+      root: rpc.connect(
         client.same_origin_url(
           base_path() <> "/rpc?room=" <> room_name() <> "&session=" <> session_token(),
         ),
@@ -57,7 +58,7 @@ fn init(model: Model) -> #(Model, Effect(Msg)) {
 
 fn watch(model: Model) -> Effect(Msg) {
   use dispatch <- effect.from
-  client.on_broken(model.root, fn(reason) { dispatch(Broke(reason)) })
+  rpc.on_broken(model.root, fn(reason) { dispatch(Broke(reason)) })
   Nil
 }
 

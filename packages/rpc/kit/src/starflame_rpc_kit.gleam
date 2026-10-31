@@ -221,7 +221,18 @@ fn check(
       let #(path, content) = file
       case simplifile.read(root <> "/" <> path) {
         Ok(existing) if existing == content -> Error(Nil)
-        Ok(_) -> Ok("  " <> path <> " is out of date")
+        Ok(existing) -> {
+          // Formatter versions can lay out the same program differently.
+          // Compare both programs using the current compiler's formatter.
+          case string.ends_with(path, ".gleam") {
+            True ->
+              case format(existing) {
+                Ok(normalised) if normalised == content -> Error(Nil)
+                _ -> Ok("  " <> path <> " is out of date")
+              }
+            False -> Ok("  " <> path <> " is out of date")
+          }
+        }
         Error(_) -> Ok("  " <> path <> " is missing")
       }
     })

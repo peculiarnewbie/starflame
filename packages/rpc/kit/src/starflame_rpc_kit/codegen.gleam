@@ -64,7 +64,7 @@ type Scope {
 /// Aliases the generated modules use for libraries.
 const library_aliases = [
   "api", "client", "decode", "dict", "dynamic", "fast_decode", "gleam", "option",
-  "plain", "promise", "server", "wire",
+  "plain", "promise", "server", "unsafe_rpc", "wire",
 ]
 
 fn scope(api: Api, prefix: String) -> Scope {
@@ -781,6 +781,7 @@ fn server_module(scope: Scope) -> String {
         scope,
         method.name,
         "context: server.Context",
+        "context",
         "api." <> method.name <> "(context" <> arguments_prefix(method),
         method,
       )
@@ -806,6 +807,7 @@ fn server_module(scope: Scope) -> String {
             scope,
             prefix <> "_" <> method.name,
             receiver <> ": " <> type_,
+            receiver,
             receiver <> "." <> method.name <> "(",
             method,
           )
@@ -836,6 +838,7 @@ fn dispatcher(
   scope: Scope,
   name: String,
   receiver: String,
+  owner: String,
   call: String,
   method: Method,
 ) -> String {
@@ -860,7 +863,13 @@ fn dispatcher(
           <> decoder(scope, ty)
           <> ")\n"
         Callback(..) ->
-          "use " <> param.1 <> " <- server.callback(" <> param.1 <> ")\n"
+          "use "
+          <> param.1
+          <> " <- server.callback_for("
+          <> owner
+          <> ", "
+          <> param.1
+          <> ")\n"
       }
     }),
   )
@@ -964,7 +973,7 @@ pub fn dispose(api: Api) -> Nil {
       <> prefix
       <> "_decoder() -> decode.Decoder("
       <> type_
-      <> ") {\nclient.stub_decoder() |> decode.map("
+      <> ") {\nunsafe_rpc.stub_decoder() |> decode.map("
       <> type_
       <> ")\n}\n\n"
       <> string.join(
@@ -1032,7 +1041,7 @@ fn client_function(
   ])
   <> ") -> promise.Promise(Result("
   <> annotation(scope, method.returns, True)
-  <> ", client.RpcError)) {\nclient.call("
+  <> ", client.RpcError)) {\nunsafe_rpc.call("
   <> stub
   <> ", \""
   <> method.name
@@ -1056,9 +1065,10 @@ fn client_callback(
   callback: String,
 ) -> String {
   case arguments {
-    [] -> "client.callback(decode.success(Nil), fn(_) { " <> callback <> "() })"
+    [] ->
+      "unsafe_rpc.callback(decode.success(Nil), fn(_) { " <> callback <> "() })"
     [argument] ->
-      "client.callback(decode.at([0], "
+      "unsafe_rpc.callback(decode.at([0], "
       <> decoder(scope, argument)
       <> "), "
       <> callback
@@ -1068,7 +1078,7 @@ fn client_callback(
         list.index_map(arguments, fn(_, index) {
           "value_" <> int.to_string(index)
         })
-      "client.callback({ "
+      "unsafe_rpc.callback({ "
       <> string.join(
         list.index_map(list.zip(arguments, names), fn(entry, index) {
           "use "
@@ -1124,13 +1134,16 @@ fn targets_module(scope: Scope) -> String {
       <> class
       <> " extends RpcTarget {\n  #"
       <> field
-      <> ": unknown;\n\n  constructor("
+      <> ": unknown;\n  #disposed = false;\n\n  constructor("
       <> field
       <> ": unknown) {\n    super();\n    this.#"
       <> field
       <> " = "
       <> field
-      <> ";\n  }\n"
+      <> ";\n    runtime.retain_capability("
+      <> field
+      <> ");\n  }\n"
+      <> target_dispose("this.#" <> field)
       <> string.concat(
         list.map(capability.methods, fn(method) {
           target_method(
@@ -1160,11 +1173,12 @@ fn targets_module(scope: Scope) -> String {
   <> starflame
   <> "\";\n\n"
   <> "export class Api extends RpcTarget {\n"
-  <> "  #context: runtime.Context$;\n\n"
+  <> "  #context: runtime.Context$;\n  #disposed = false;\n\n"
   <> "  constructor(context: runtime.Context$) {\n"
   <> "    super();\n"
-  <> "    this.#context = context;\n"
+  <> "    this.#context = context;\n    runtime.retain_capability(context);\n"
   <> "  }\n"
+  <> target_dispose("this.#context")
   <> string.concat(methods)
   <> "}\n\n"
   <> string.concat(list.map(capabilities, fn(class) { class <> "\n" }))
@@ -1177,6 +1191,12 @@ fn targets_module(scope: Scope) -> String {
   <> "  const context = runtime.new_context(env, execution);\n"
   <> "  return new Api(runtime.with_auth(context, auth));\n"
   <> "}\n"
+}
+
+fn target_dispose(owner: String) -> String {
+  "\n  [Symbol.dispose]() {\n    if (this.#disposed) return;\n    this.#disposed = true;\n    runtime.release_capability("
+  <> owner
+  <> ");\n  }\n"
 }
 
 fn target_method(
@@ -1262,6 +1282,7 @@ fn module(
     #("starflame/fast_decode", "fast_decode"),
     #("starflame/plain", "plain"),
     #("starflame/server", "server"),
+    #("starflame/unsafe_rpc", "unsafe_rpc"),
     #(scope.prefix <> "/wire", "wire"),
   ]
   let imports =

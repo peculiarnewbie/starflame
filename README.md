@@ -6,6 +6,11 @@ Full-stack functional programming in Gleam, deployed on Cloudflare Workers.
 Lustre handles the UI, Cap'n Web handles typed RPC, and D1 stores the data.
 Starflame is the small runtime and build integration connecting them.
 
+RPC clients and dispatchers are generated from one checked Gleam API, including
+returned capabilities and live callbacks. Application calls use those generated
+functions; `check` rejects stale contracts, and Gleam rejects incompatible
+implementations or callers. See the [RPC type guarantee](packages/rpc/kit/README.md#type-guarantee).
+
 ## Why
 
 Algebraic data types, pattern matching, immutable data, and explicit errors are

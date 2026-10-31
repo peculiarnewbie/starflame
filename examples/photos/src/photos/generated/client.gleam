@@ -10,6 +10,7 @@ import photos/shared
 import starflame/client
 import starflame/fast_decode
 import starflame/plain
+import starflame/unsafe_rpc
 
 pub opaque type Api {
   Api(stub: client.Stub)
@@ -51,7 +52,7 @@ pub fn bytes(
 ) -> promise.Promise(
   Result(Result(BitArray, shared.PhotoError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "bytes",
     [plain.string(id)],
@@ -72,7 +73,7 @@ pub fn delete(
   api: Api,
   id id: String,
 ) -> promise.Promise(Result(Result(Nil, shared.PhotoError), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "delete",
     [plain.string(id)],
@@ -89,7 +90,7 @@ pub fn delete(
 pub fn list_photos(
   api: Api,
 ) -> promise.Promise(Result(List(shared.Photo), client.RpcError)) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "list_photos",
     [],
@@ -103,7 +104,7 @@ pub fn list_photos(
 
 /// The caller's public id, so the UI can mark their uploads.
 pub fn me(api: Api) -> promise.Promise(Result(String, client.RpcError)) {
-  client.call(api.stub, "me", [], decode.string)
+  unsafe_rpc.call(api.stub, "me", [], decode.string)
 }
 
 pub fn upload(
@@ -114,7 +115,7 @@ pub fn upload(
 ) -> promise.Promise(
   Result(Result(shared.Photo, shared.PhotoError), client.RpcError),
 ) {
-  client.call(
+  unsafe_rpc.call(
     api.stub,
     "upload",
     [plain.string(name), plain.string(content_type), plain.bit_array(body)],

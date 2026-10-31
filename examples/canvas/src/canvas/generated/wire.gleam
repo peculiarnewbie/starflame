@@ -21,16 +21,6 @@ pub const point_kind =
     ],
   )
 
-/// What `stroke_draft_decoder` checks before building a value directly.
-pub const stroke_draft_kind =
-  fast_decode.RecordKind(
-    [
-      fast_decode.Field("points", fast_decode.ListKind(point_kind), False),
-      fast_decode.Field("color", fast_decode.StringKind, False),
-      fast_decode.Field("width", fast_decode.FloatKind, False),
-    ],
-  )
-
 /// What `stroke_decoder` checks before building a value directly.
 pub const stroke_kind =
   fast_decode.RecordKind(
@@ -41,6 +31,16 @@ pub const stroke_kind =
       fast_decode.Field("color", fast_decode.StringKind, False),
       fast_decode.Field("width", fast_decode.FloatKind, False),
       fast_decode.Field("created_at", fast_decode.IntKind, False),
+    ],
+  )
+
+/// What `stroke_draft_decoder` checks before building a value directly.
+pub const stroke_draft_kind =
+  fast_decode.RecordKind(
+    [
+      fast_decode.Field("points", fast_decode.ListKind(point_kind), False),
+      fast_decode.Field("color", fast_decode.StringKind, False),
+      fast_decode.Field("width", fast_decode.FloatKind, False),
     ],
   )
 
@@ -58,6 +58,22 @@ pub const canvas_error_kind =
         [fast_decode.Field("color", fast_decode.StringKind, False)],
       ),
       fast_decode.Variant("BadWidth", []),
+    ],
+  )
+
+/// What `board_event_decoder` checks before building a value directly.
+pub const board_event_kind =
+  fast_decode.VariantsKind(
+    [
+      fast_decode.Variant(
+        "StrokeAdded",
+        [fast_decode.Field("stroke", stroke_kind, False)],
+      ),
+      fast_decode.Variant("Cleared", []),
+      fast_decode.Variant(
+        "Presence",
+        [fast_decode.Field("online", fast_decode.IntKind, False)],
+      ),
     ],
   )
 
@@ -81,41 +97,6 @@ fn point_fallback() -> decode.Decoder(shared.Point) {
   use x <- decode.field("x", decode.float)
   use y <- decode.field("y", decode.float)
   decode.success(shared.Point(x:, y:))
-}
-
-// StrokeDraft -----------------------------------------------------------------
-
-pub fn stroke_draft_to_plain(value: shared.StrokeDraft) -> plain.Plain {
-  let shared.StrokeDraft(points:, color:, width:) = value
-  plain.object([
-    #("points", plain.list(points, point_to_plain)),
-    #("color", plain.string(color)),
-    #("width", plain.float(width)),
-  ])
-}
-
-pub fn stroke_draft_decoder() -> decode.Decoder(shared.StrokeDraft) {
-  fast_decode.kind_decoder(
-    stroke_draft_kind,
-    stroke_draft_from_plain,
-    stroke_draft_fallback,
-  )
-}
-
-/// Builds a value that matched `stroke_draft_kind`.
-pub fn stroke_draft_from_plain(value: dynamic.Dynamic) -> shared.StrokeDraft {
-  shared.StrokeDraft(
-    points: fast_decode.list(fast_decode.get(value, "points"), point_from_plain),
-    color: fast_decode.get(value, "color"),
-    width: fast_decode.get(value, "width"),
-  )
-}
-
-fn stroke_draft_fallback() -> decode.Decoder(shared.StrokeDraft) {
-  use points <- decode.field("points", decode.list(point_decoder()))
-  use color <- decode.field("color", decode.string)
-  use width <- decode.field("width", decode.float)
-  decode.success(shared.StrokeDraft(points:, color:, width:))
 }
 
 // Stroke ----------------------------------------------------------------------
@@ -165,6 +146,41 @@ fn stroke_fallback() -> decode.Decoder(shared.Stroke) {
   ))
 }
 
+// StrokeDraft -----------------------------------------------------------------
+
+pub fn stroke_draft_to_plain(value: shared.StrokeDraft) -> plain.Plain {
+  let shared.StrokeDraft(points:, color:, width:) = value
+  plain.object([
+    #("points", plain.list(points, point_to_plain)),
+    #("color", plain.string(color)),
+    #("width", plain.float(width)),
+  ])
+}
+
+pub fn stroke_draft_decoder() -> decode.Decoder(shared.StrokeDraft) {
+  fast_decode.kind_decoder(
+    stroke_draft_kind,
+    stroke_draft_from_plain,
+    stroke_draft_fallback,
+  )
+}
+
+/// Builds a value that matched `stroke_draft_kind`.
+pub fn stroke_draft_from_plain(value: dynamic.Dynamic) -> shared.StrokeDraft {
+  shared.StrokeDraft(
+    points: fast_decode.list(fast_decode.get(value, "points"), point_from_plain),
+    color: fast_decode.get(value, "color"),
+    width: fast_decode.get(value, "width"),
+  )
+}
+
+fn stroke_draft_fallback() -> decode.Decoder(shared.StrokeDraft) {
+  use points <- decode.field("points", decode.list(point_decoder()))
+  use color <- decode.field("color", decode.string)
+  use width <- decode.field("width", decode.float)
+  decode.success(shared.StrokeDraft(points:, color:, width:))
+}
+
 // CanvasError -----------------------------------------------------------------
 
 pub fn canvas_error_to_plain(value: shared.CanvasError) -> plain.Plain {
@@ -211,5 +227,53 @@ fn canvas_error_fallback() -> decode.Decoder(shared.CanvasError) {
     }
     "BadWidth" -> decode.success(shared.BadWidth)
     _ -> decode.failure(shared.EmptyStroke, "CanvasError")
+  }
+}
+
+// BoardEvent ------------------------------------------------------------------
+
+pub fn board_event_to_plain(value: shared.BoardEvent) -> plain.Plain {
+  case value {
+    shared.StrokeAdded(stroke:) ->
+      plain.tagged("StrokeAdded", [#("stroke", stroke_to_plain(stroke))])
+    shared.Cleared -> plain.tagged("Cleared", [])
+    shared.Presence(online:) ->
+      plain.tagged("Presence", [#("online", plain.int(online))])
+  }
+}
+
+pub fn board_event_decoder() -> decode.Decoder(shared.BoardEvent) {
+  fast_decode.kind_decoder(
+    board_event_kind,
+    board_event_from_plain,
+    board_event_fallback,
+  )
+}
+
+/// Builds a value that matched `board_event_kind`.
+pub fn board_event_from_plain(value: dynamic.Dynamic) -> shared.BoardEvent {
+  case fast_decode.tag(value) {
+    "StrokeAdded" ->
+      shared.StrokeAdded(
+        stroke: stroke_from_plain(fast_decode.get(value, "stroke")),
+      )
+    "Cleared" -> shared.Cleared
+    _ -> shared.Presence(online: fast_decode.get(value, "online"))
+  }
+}
+
+fn board_event_fallback() -> decode.Decoder(shared.BoardEvent) {
+  use tag <- decode.field("$", decode.string)
+  case tag {
+    "StrokeAdded" -> {
+      use stroke <- decode.field("stroke", stroke_decoder())
+      decode.success(shared.StrokeAdded(stroke:))
+    }
+    "Cleared" -> decode.success(shared.Cleared)
+    "Presence" -> {
+      use online <- decode.field("online", decode.int)
+      decode.success(shared.Presence(online:))
+    }
+    _ -> decode.failure(shared.Cleared, "BoardEvent")
   }
 }

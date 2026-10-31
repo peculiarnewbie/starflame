@@ -32,6 +32,15 @@ pub fn execution(context: Context) -> Dynamic {
   context.execution
 }
 
+/// Runs operations in order for this execution context. Durable Object APIs
+/// use this to keep asynchronous reads, writes, and snapshots in commit order.
+pub fn serialise(
+  context: Context,
+  operation: fn() -> Promise(a),
+) -> Promise(a) {
+  serialise_execution(context.execution, operation)
+}
+
 /// What the Worker passed as `auth` to `newApi`, or `Nil` when it passed
 /// nothing. Decode it into the app's own type:
 ///
@@ -70,6 +79,37 @@ pub fn callback(
   }
 }
 
+/// Registers cleanup for a returned capability. Generated targets run it when
+/// the last target for this value is disposed, including when its session ends.
+/// Return a fresh capability for each independently owned resource.
+@external(javascript, "./server_ffi.mjs", "withDispose")
+pub fn with_dispose(capability: a, cleanup: fn() -> Nil) -> a
+
+/// Used by generated targets to retain their capability's resources.
+@external(javascript, "./server_ffi.mjs", "retainCapability")
+pub fn retain_capability(capability: a) -> Nil
+
+/// Used by generated targets to release their capability's resources.
+@external(javascript, "./server_ffi.mjs", "releaseCapability")
+pub fn release_capability(capability: a) -> Nil
+
+/// A callback owned by a generated target. Retain the Cap'n Web stub beyond
+/// the current call, and release it with the target instead of losing it as
+/// soon as the method returns.
+pub fn callback_for(
+  owner: a,
+  value: Dynamic,
+  next: fn(fn(List(Plain)) -> Nil) -> Promise(Plain),
+) -> Promise(Plain) {
+  case is_function(value) {
+    True -> {
+      let retained = retain_callback(owner, value)
+      next(fn(arguments) { call_stub(retained, arguments) })
+    }
+    False -> reject("Invalid RPC argument: expected a function")
+  }
+}
+
 fn describe(errors: List(DecodeError)) -> String {
   errors
   |> list.map(fn(error) {
@@ -90,3 +130,12 @@ fn is_function(value: Dynamic) -> Bool
 
 @external(javascript, "./server_ffi.mjs", "callStub")
 fn call_stub(stub: Dynamic, args: List(Plain)) -> Nil
+
+@external(javascript, "./server_ffi.mjs", "retainCallback")
+fn retain_callback(owner: a, stub: Dynamic) -> Dynamic
+
+@external(javascript, "./server_ffi.mjs", "serialise")
+fn serialise_execution(
+  execution: Dynamic,
+  operation: fn() -> Promise(a),
+) -> Promise(a)

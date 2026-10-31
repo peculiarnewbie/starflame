@@ -11,24 +11,76 @@ import gleam/javascript/promise
 import starflame/plain
 import starflame/server
 
-pub fn add_stroke(
-  context: server.Context,
-  draft: dynamic.Dynamic,
+pub fn enter(context: server.Context) -> promise.Promise(plain.Plain) {
+  api.enter(context)
+  |> board_to_plain
+  |> promise.resolve
+}
+
+pub fn watch(context: server.Context) -> promise.Promise(plain.Plain) {
+  api.watch(context)
+  |> board_view_to_plain
+  |> promise.resolve
+}
+
+// Board -----------------------------------------------------------------------
+
+@external(javascript, "./targets.ts", "newBoardTarget")
+fn board_to_plain(board: api.Board) -> plain.Plain
+
+pub fn board_snapshot(board: api.Board) -> promise.Promise(plain.Plain) {
+  board.snapshot()
+  |> plain.list(wire.stroke_to_plain)
+  |> promise.resolve
+}
+
+pub fn board_add(
+  board: api.Board,
+  arg_1: dynamic.Dynamic,
 ) -> promise.Promise(plain.Plain) {
-  use draft <- server.arg(draft, wire.stroke_draft_decoder())
-  api.add_stroke(context, draft:)
+  use arg_1 <- server.arg(arg_1, wire.stroke_draft_decoder())
+  board.add(arg_1)
   |> plain.result(wire.stroke_to_plain, wire.canvas_error_to_plain)
   |> promise.resolve
 }
 
-pub fn clear(context: server.Context) -> promise.Promise(plain.Plain) {
-  api.clear(context)
+pub fn board_clear(board: api.Board) -> promise.Promise(plain.Plain) {
+  board.clear()
   |> plain.result(plain.nil, wire.canvas_error_to_plain)
   |> promise.resolve
 }
 
-pub fn snapshot(context: server.Context) -> promise.Promise(plain.Plain) {
-  api.snapshot(context)
+pub fn board_subscribe(
+  board: api.Board,
+  arg_1: dynamic.Dynamic,
+) -> promise.Promise(plain.Plain) {
+  use arg_1 <- server.callback_for(board, arg_1)
+  board.subscribe(fn(value_0) { arg_1([wire.board_event_to_plain(value_0)]) })
+  |> plain.nil
+  |> promise.resolve
+}
+
+// BoardView -------------------------------------------------------------------
+
+@external(javascript, "./targets.ts", "newBoardViewTarget")
+fn board_view_to_plain(board_view: api.BoardView) -> plain.Plain
+
+pub fn board_view_snapshot(
+  board_view: api.BoardView,
+) -> promise.Promise(plain.Plain) {
+  board_view.snapshot()
   |> plain.list(wire.stroke_to_plain)
+  |> promise.resolve
+}
+
+pub fn board_view_subscribe(
+  board_view: api.BoardView,
+  arg_1: dynamic.Dynamic,
+) -> promise.Promise(plain.Plain) {
+  use arg_1 <- server.callback_for(board_view, arg_1)
+  board_view.subscribe(fn(value_0) {
+    arg_1([wire.board_event_to_plain(value_0)])
+  })
+  |> plain.nil
   |> promise.resolve
 }
