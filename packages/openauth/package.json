@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "gleam build",
-    "test": "gleam build && node test/run.mjs"
+    "test": "gleam build && node --test test/kv.test.mjs && node test/run.mjs"
   },
   "devDependencies": {
     "@openauthjs/openauth": "0.4.3",
