@@ -130,8 +130,9 @@ console.log("\n# Live events");
   const posted = events.find((e) => e.$ === "StrokeAdded");
   check("the other capability receives the stroke", posted !== undefined);
 
-  await adaBoard.clear();
+  const cleared = await adaBoard.clear();
   await tick();
+  check("clear returns an Ok result", cleared.$ === "Ok", JSON.stringify(cleared));
   check("clear broadcasts", events.some((e) => e.$ === "Cleared"));
   check("clear empties the snapshot", arr(await adaBoard.snapshot()).length === 0);
 }

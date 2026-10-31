@@ -67,8 +67,21 @@ pub fn add_stroke(
   )
 }
 
-pub fn clear(api: Api) -> promise.Promise(Result(Nil, client.RpcError)) {
-  client.call(api.stub, "clear", [], plain.nil_decoder())
+pub fn clear(
+  api: Api,
+) -> promise.Promise(Result(Result(Nil, shared.CanvasError), client.RpcError)) {
+  client.call(
+    api.stub,
+    "clear",
+    [],
+    fast_decode.kind_decoder(
+      fast_decode.ResultKind(fast_decode.NilKind, wire.canvas_error_kind),
+      fast_decode.result(_, fn(_) { Nil }, wire.canvas_error_from_plain),
+      fn() {
+        plain.result_decoder(plain.nil_decoder(), wire.canvas_error_decoder())
+      },
+    ),
+  )
 }
 
 pub fn snapshot(

@@ -77,14 +77,14 @@ pub fn snapshot(context: server.Context) -> List(Stroke) {
   rows
 }
 
-pub fn clear(context: server.Context) -> Nil {
+pub fn clear(context: server.Context) -> Result(Nil, CanvasError) {
   let #(_, room) = identity(context)
   use db <- with_db(context)
   use _ <-
     or_reject(sql.run(db, "DELETE FROM strokes WHERE room = ?", [
       sql.string(room),
     ]))
-  Nil
+  Ok(Nil)
 }
 
 // VALIDATION ------------------------------------------------------------------

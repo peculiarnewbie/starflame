@@ -23,7 +23,7 @@ pub fn add_stroke(
 
 pub fn clear(context: server.Context) -> promise.Promise(plain.Plain) {
   api.clear(context)
-  |> plain.nil
+  |> plain.result(plain.nil, wire.canvas_error_to_plain)
   |> promise.resolve
 }
 
